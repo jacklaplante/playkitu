@@ -1,13 +1,15 @@
 <p align="center"><img src="docs/assets/banner.svg" alt="playreel: playtest recordings for more playful games" width="960" /></p>
 
 <p align="center"><strong>Gameplay, game audio, optional voice, and the logs that explain what happened.</strong></p>
-<p align="center"><strong>Free and open source</strong> · Unity · Windows 64-bit (x86-64) only · Steam</p>
+<p align="center"><strong>Free and open source</strong> · Unity · Windows 64-bit (x86-64) only (as of right now) · Steam</p>
 
 playreel helps developers see their game through a playtester's eyes. Players consent and play. Recordings stream while the game runs, and matching diagnostic logs give developers context for improving the game.
 
 **Free and open source:** the original project code is [MIT licensed](LICENSE). There is no playreel subscription or software fee. You deploy the backend in your own AWS account and pay its infrastructure and usage costs.
 
-**Recording support: Windows 64-bit (x86-64) only.** The Unity recording client and native runtime currently support this platform. macOS, Linux, 32-bit Windows and native ARM64 players are unsupported. This platform restriction applies to the recording client; the supplied backend runs on AWS.
+**Contributions welcome!** Help make playreel useful for more developers: bug fixes, documentation, examples, testing and support for more platforms are all welcome. [Get involved](CONTRIBUTING.md).
+
+**Current recording support: Windows 64-bit (x86-64) only.** The Unity recording client and native runtime currently support this platform. macOS, Linux, 32-bit Windows and native ARM64 players are not supported yet; contributions toward broader platform support are welcome. This platform restriction applies to the recording client; the supplied backend runs on AWS.
 
 **Experimental, source-first release.** Independent Unity import, lifecycle, native, backend, download and infrastructure checks pass. A small Windows IL2CPP sample also passes native loading and cleanup. A freshly deployed end-to-end installation and clean-machine support remain release checks. Prebuilt native binaries are not distributed here.
 
@@ -86,7 +88,7 @@ GStreamer, Windows Media Foundation and AWS's producer SDK provide the native me
 | Deployment | One configured app/account/region per AWS deployment |
 | Sessions | Up to four hours, followed by bounded diagnostic finalization |
 | Cloud retention | 30 days in the supplied deployment |
-| Other platforms/clouds | Outside initial support |
+| Other platforms/clouds | Outside current support; contributions welcome |
 
 Gameplay takes priority. Recording can drop media under load. Exact final frames, lossless recovery and continuous coverage are not guaranteed. Log navigation reports uncertainty or unavailable media instead of inventing a match.
 
@@ -112,6 +114,6 @@ Uninstalling client code does not delete retained recordings or paid infrastruct
 
 ## Contributing and licensing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+**Issues and pull requests are welcome.** Whether you're fixing a bug, improving a guide, sharing an integration example or helping bring recording to another platform, we'd love your help. Small improvements count too. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started and [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately.
 
 Original project code is **[MIT licensed](LICENSE)**. Dependencies retain their own terms. Native binary distribution needs corresponding-source, notices, replacement-right and redistribution work beyond this license. Read [third-party notices](THIRD_PARTY_NOTICES.md) and [native redistribution status](native/REDISTRIBUTION.md).
