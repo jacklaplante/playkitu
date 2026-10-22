@@ -1,0 +1,9 @@
+/private/
+**/.terraform/
+**/*.tfstate*
+**/*.tfplan
+**/*.tfvars
+**/*.tfvars.json
+**/crash.log
+**/backend_override.tf
+!**/*.example.tfvars

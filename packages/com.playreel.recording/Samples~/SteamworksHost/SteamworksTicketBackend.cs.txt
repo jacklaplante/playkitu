@@ -1,0 +1,19 @@
+using System;
+using Playreel.Steam;
+using Steamworks;
+// Compile in a HOST assembly with Steamworks.NET installed. Pass the existing
+// Steam owner's initialized flag; the host continues to pump Steam callbacks.
+public sealed class SteamworksTicketBackend : ISteamWebTicketBackend
+{
+    private readonly Func<bool> available;
+    private Action<SteamWebTicketResponse> received;
+    private Callback<GetTicketForWebApiResponse_t> callback;
+    public SteamworksTicketBackend(Func<bool> available) { this.available = available; }
+    public bool Available => available();
+    public event Action<SteamWebTicketResponse> Received {
+        add { if (callback == null) callback = Callback<GetTicketForWebApiResponse_t>.Create(data => received?.Invoke(new SteamWebTicketResponse((uint)data.m_hAuthTicket, (int)data.m_eResult, data.m_rgubTicket, data.m_cubTicket))); received += value; }
+        remove { received -= value; if (received == null) { callback?.Dispose(); callback = null; } }
+    }
+    public uint Request(string identity) => (uint)SteamUser.GetAuthTicketForWebApi(identity);
+    public void Cancel(uint handle) => SteamUser.CancelAuthTicket(new HAuthTicket(handle));
+}

@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "artifacts": [
+    {
+      "file": "gstreamer.exe",
+      "url": "https://gstreamer.freedesktop.org/data/pkg/windows/1.28.8/msvc/gstreamer-1.0-msvc-x86_64-1.28.8.exe",
+      "sha256": "e4c41ee6ee9c6c32a45d198463ec08d79bac3bd5fa58adc93d13fe4a08abc9d9",
+      "version": "1.28.8 MSVC x64",
+      "license": "Mixed; only allowlisted plugin/PE closure is packaged"
+    },
+    {
+      "file": "innounp.zip",
+      "url": "https://raw.githubusercontent.com/jrathlev/InnoUnpacker-Windows-GUI/6fb49264aacf512a093e7b4fc6fb3dd266dad31a/innounp-2/bin/innounp-2.zip",
+      "sha256": "f2f037fdbc63de31248efae9ccb294398d160dc0cbad5f36d14c2f159e17bbf5",
+      "version": "2.71.1",
+      "license": "GPL; build-only extraction tool, not packaged"
+    },
+    {
+      "file": "producer.zip",
+      "url": "https://codeload.github.com/awslabs/amazon-kinesis-video-streams-producer-sdk-cpp/zip/refs/tags/v3.6.0",
+      "sha256": "8ff740cab89452f5e7a19c4a41b13c6c4391d69c76286c43f118cd4afdd382a9",
+      "version": "3.6.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "file": "producer-c.zip",
+      "url": "https://codeload.github.com/awslabs/amazon-kinesis-video-streams-producer-c/zip/refs/tags/v1.6.2",
+      "sha256": "19516aa393c82e3fb7d65e803b6c15a4c2538fe7e729ad5772f8f9afbda62a52",
+      "version": "1.6.2",
+      "license": "Apache-2.0"
+    },
+    {
+      "file": "pic.zip",
+      "url": "https://codeload.github.com/awslabs/amazon-kinesis-video-streams-pic/zip/refs/tags/v1.3.1",
+      "sha256": "81a24d279877d9c3906ed89b20f14e6ff91a866d5eed41fae9df9e1b6791d7fa",
+      "version": "1.3.1",
+      "license": "Apache-2.0"
+    },
+    {
+      "file": "log4cplus-current.zip",
+      "url": "https://codeload.github.com/log4cplus/log4cplus/zip/refs/tags/REL_2_2_1",
+      "sha256": "efed99eaa97d57b7bda28edde8ba5cc6182774dad59762a61cf21c4920c7624c",
+      "version": "2.2.1",
+      "license": "Apache-2.0 / BSD-2-Clause; see source LICENSE"
+    },
+    {
+      "file": "threadpool.zip",
+      "url": "https://codeload.github.com/log4cplus/ThreadPool/zip/3abd50f329c2bc20e379b3d467774ffd8e3b1343",
+      "sha256": "1e78d958d9c532f809186703b6737f65627be5d054a4c090a1287e060e7c147e",
+      "version": "3abd50f329c2bc20e379b3d467774ffd8e3b1343",
+      "license": "zlib"
+    },
+    {
+      "file": "7zr.exe",
+      "url": "https://github.com/ip7z/7zip/releases/download/26.04/7zr.exe",
+      "sha256": "256feca8e274e5da655e2a284fabafd9f554365eb164862089dacd4e8276d282",
+      "version": "26.04",
+      "license": "Public domain, build-only extractor"
+    },
+    {
+      "file": "7zip.exe",
+      "url": "https://github.com/ip7z/7zip/releases/download/26.04/7z2604-x64.exe",
+      "sha256": "d54bf805f9f3704d1e8db2fa3498ae7ef2df0312b40b558e7c71c734430a665d",
+      "version": "26.04",
+      "license": "LGPL/BSD/unRAR; build-only extractor, installer is extracted, never run"
+    }
+  ]
+}

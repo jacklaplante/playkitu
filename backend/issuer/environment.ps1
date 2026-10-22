@@ -1,0 +1,14 @@
+$ErrorActionPreference='Stop'
+$taskRoot=$PSScriptRoot
+$taskPrivate=Join-Path $taskRoot 'private'
+$taskSdk=if($env:PLAYREEL_DOTNET_ROOT){[IO.Path]::GetFullPath($env:PLAYREEL_DOTNET_ROOT)}else{Join-Path $taskPrivate 'sdk'}
+$env:DOTNET_ROOT=$taskSdk
+$env:DOTNET_CLI_HOME=Join-Path $taskPrivate 'cli'
+$env:NUGET_PACKAGES=Join-Path $taskPrivate 'packages'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
+$env:DOTNET_GENERATE_ASPNET_CERTIFICATE='false'
+$env:DOTNET_NOLOGO='1'
+$env:DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE='true'
+$env:MSBUILD_ENABLE_WORKLOAD_RESOLVER='false'
+$env:AWS_EC2_METADATA_DISABLED='true'

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "00112233-4455-6677-8899-aabbccddeeff",
+  "admissionGeneration": 1,
+  "objectKind": "time-index",
+  "sequence": 1,
+  "sessionClock": { "clockId": "managed-stopwatch", "frequencyHz": 10000000, "startTicks": null, "sessionElapsedNs": 0, "utc": "2026-10-15T12:00:00.0000000+00:00", "uncertaintyNs": 200 },
+  "producerRuns": [
+    { "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "epoch": 1, "recordingStart": null, "ranges": {} },
+    { "producerRunId": "22334455-6677-8899-aabb-ccddeeff0011", "epoch": 0, "recordingStart": null, "ranges": {} }
+  ],
+  "records": [
+    { "kind": "reset", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 9, "epoch": 1, "flags": 0, "result": 0 },
+    { "kind": "gap", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 11, "epoch": 1, "flags": 2, "result": 0,
+      "droppedObservations": 18446744073709551614, "observationClock": { "qpc": null, "frequencyHz": null, "unix100ns": null, "uncertainty100ns": null } },
+    { "kind": "ack", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 12, "epoch": 1, "flags": 2, "ackType": 2, "result": 0,
+      "upload": 18446744073709551614, "fragment": "913438523331814323926820631849", "ackTimecodeMs": null },
+    { "kind": "gap", "reason": "post_exhausted", "elapsedNs": 12000000000, "objectKind": "log", "objectSequence": 2, "logBytes": 9, "acceptedLogByteOffset": null }
+  ],
+  "droppedRecords": 2,
+  "droppedRuns": 0,
+  "droppedObjects": 1,
+  "droppedLogBytes": 9
+}

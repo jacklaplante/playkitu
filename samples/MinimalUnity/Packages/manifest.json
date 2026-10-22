@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "com.playreel.recording": "file:../../../packages/com.playreel.recording",
+    "com.unity.test-framework": "1.1.33",
+    "com.unity.toolchain.win-x86_64-linux-x86_64": "2.0.11",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.modules.unitywebrequestwww": "1.0.0"
+  },
+  "testables": [
+    "com.playreel.recording"
+  ]
+}

@@ -1,0 +1,294 @@
+diff --git a/src/source/Common/RequestInfo.c b/src/source/Common/RequestInfo.c
+--- a/src/source/Common/RequestInfo.c
++++ b/src/source/Common/RequestInfo.c
+@@ -222,7 +222,8 @@ CleanUp:
+     if (STATUS_FAILED(retStatus) && pRequestHeader != NULL) {
+         MEMFREE(pRequestHeader);
+     } else {
+-        DLOGD("Appending header to request: %s -> %s", headerName, headerValue);
++        // Playreel B2a: request headers include credentials even during offline signing.
++        DLOGD("Appending header to request (value omitted)");
+     }
+ 
+     return retStatus;
+diff --git a/src/source/Response.c b/src/source/Response.c
+--- a/src/source/Response.c
++++ b/src/source/Response.c
+@@ -4,6 +4,9 @@
+ #define LOG_CLASS "Response"
+ #include "Include_i.h"
+ 
++static __declspec(thread) unsigned sbrecSenderTransportDepth;
++
++
+ /**
+  * Create Response object
+  */
+@@ -409,11 +412,9 @@ STATUS curlCompleteSync(PCurlResponse pCurlResponse)
+ {
+     STATUS retStatus = STATUS_SUCCESS, status = STATUS_SUCCESS;
+     PCHAR url;
+-    struct curl_slist* header;
+     PCurlApiCallbacks pCurlApiCallbacks;
+     CURLcode result;
+     PCurlRequest pCurlRequest;
+-    CHAR headers[MAX_REQUEST_HEADER_COUNT * (MAX_REQUEST_HEADER_STRING_LEN + MAX_REQUEST_HEADER_OUTPUT_DELIMITER)];
+ 
+     CHK(pCurlResponse != NULL && pCurlResponse->pCurlRequest != NULL && pCurlResponse->pCurlRequest->pCurlApiCallbacks != NULL, STATUS_NULL_ARG);
+     pCurlRequest = pCurlResponse->pCurlRequest;
+@@ -434,7 +435,9 @@ STATUS curlCompleteSync(PCurlResponse pCurlResponse)
+     ATOMIC_STORE_BOOL(&pCurlRequest->blockedInCurl, TRUE);
+ 
+     // NOTE: Blocking call!
++    ++sbrecSenderTransportDepth;
+     result = curl_easy_perform(pCurlResponse->pCurl);
++    --sbrecSenderTransportDepth;
+ 
+     ATOMIC_STORE_BOOL(&pCurlRequest->blockedInCurl, FALSE);
+     CHK(!ATOMIC_LOAD_BOOL(&pCurlRequest->requestInfo.terminating), retStatus);
+@@ -457,15 +460,10 @@ STATUS curlCompleteSync(PCurlResponse pCurlResponse)
+ 
+     // warn and log request/response info if there was an error return code
+     if (HTTP_STATUS_CODE_OK != pCurlResponse->callInfo.httpStatus) {
+-        curl_easy_getinfo(pCurlResponse->pCurl, CURLINFO_EFFECTIVE_URL, &url);
+-        headers[0] = '\0';
+-        for (header = pCurlResponse->pRequestHeaders; header; header = header->next) {
+-            STRCAT(headers, (PCHAR) "\n    ");
+-            STRCAT(headers, header->data);
+-        }
+-
+-        DLOGW("[%s] HTTP Error %lu : Response: %s\nRequest URL: %s\nRequest Headers:%s", pCurlResponse->pCurlRequest->streamName,
+-              pCurlResponse->callInfo.httpStatus, pCurlResponse->callInfo.responseData, url, headers);
++        // Playreel B2a: signed headers, query strings and reflected response bodies
++        // can contain session credentials. Keep the result, never their values.
++        DLOGW("[%s] HTTP Error %lu (request/response details omitted)", pCurlResponse->pCurlRequest->streamName,
++              pCurlResponse->callInfo.httpStatus);
+     }
+ 
+ CleanUp:
+@@ -641,14 +639,25 @@ CleanUp:
+     return dataSize;
+ }
+ 
++/* Pacing cancellation is transport-only; no producer lock or game callback. */
++static int sbrecSenderRequestCancelled(void* context)
++{
++    PCurlRequest request=(PCurlRequest)context;
++    return ATOMIC_LOAD_BOOL(&request->requestInfo.terminating) ||
++           ATOMIC_LOAD_BOOL(&request->pCurlResponse->terminated);
++}
++
+ SIZE_T postReadCallback(PCHAR pBuffer, SIZE_T size, SIZE_T numItems, PVOID customData)
+ {
++    /* Never wait or consume SDK bytes from a producer-side unpause callback. */
++    if (!sbrecSenderTransportDepth) return CURL_READFUNC_ABORT;
+     DLOGV("postBodyStreamingReadFunc (curl callback) invoked");
+     PCurlResponse pCurlResponse = NULL;
+     PCurlApiCallbacks pCurlApiCallbacks;
+     SIZE_T bufferSize = size * numItems, bytesWritten = 0;
+     STATUS retStatus = STATUS_SUCCESS;
+-    UINT32 retrievedSize = 0;
++    UINT32 retrievedSize = 0, pacingReserved = 0;
++    LARGE_INTEGER pacingNow;
+     UINT64 sleepTime = BASE_GET_DATA_SLEEP_TIME;
+     UINT8 iter = 0;
+     UPLOAD_HANDLE uploadHandle;
+@@ -675,6 +684,18 @@ SIZE_T postReadCallback(PCHAR pBuffer, SIZE_T size, SIZE_T numItems, PVOID custo
+         CHK(FALSE, retStatus);
+     }
+ 
++    /* Reserve before the SDK advances its cursor. Limit every retrieval to the
++     * reserved bytes, and refund unused bytes at callback return. Do not PAUSE
++     * after consuming data. Existing SDK pause/data-available behavior is intact. */
++    if (!sbrecSenderAcquire(&pCurlApiCallbacks->senderPacer,
++                          (uint32_t)(bufferSize < pCurlApiCallbacks->senderPacer.config.readBytes ?
++                                     bufferSize : pCurlApiCallbacks->senderPacer.config.readBytes),
++                          sbrecSenderRequestCancelled,pCurlRequest,&pacingReserved)) {
++        bytesWritten=CURL_READFUNC_ABORT;
++        CHK(FALSE, STATUS_OPERATION_TIMED_OUT);
++    }
++    bufferSize=pacingReserved;
++
+     do {
+         // First iteration we do not sleep, after that we sleep
+         // 20 40 80 160 320 (ms)
+@@ -743,6 +764,13 @@ SIZE_T postReadCallback(PCHAR pBuffer, SIZE_T size, SIZE_T numItems, PVOID custo
+ 
+ CleanUp:
+ 
++    if (pacingReserved != 0) {
++        QueryPerformanceCounter(&pacingNow);
++        if (!sbrecSenderFinish(&pCurlApiCallbacks->senderPacer,(uint64_t)pacingNow.QuadPart,pacingReserved,
++                              bytesWritten <= pacingReserved ? (uint32_t)bytesWritten : 0))
++            bytesWritten=CURL_READFUNC_ABORT;
++    }
++
+     if (bytesWritten != CURL_READFUNC_ABORT && bytesWritten != CURL_READFUNC_PAUSE) {
+         DLOGD("[%s] Wrote %u bytes to Kinesis Video. Upload stream handle: %" PRIu64, streamName, bytesWritten, uploadHandle);
+         if (bytesWritten != 0 && pCurlResponse->debugDumpFile) {
+diff --git a/src/source/CurlApiCallbacks.h b/src/source/CurlApiCallbacks.h
+--- a/src/source/CurlApiCallbacks.h
++++ b/src/source/CurlApiCallbacks.h
+@@ -97,6 +97,8 @@ typedef struct __EndpointTracker* PEndpointTracker;
+  * The KVS backend specific callbacks
+  */
+ typedef struct __CurlApiCallbacks CurlApiCallbacks;
++#include "SbrecSenderPacing.h"
++
+ struct __CurlApiCallbacks {
+     // First member should be the API callbacks
+     ApiCallbacks apiCallbacks;
+@@ -178,6 +180,9 @@ struct __CurlApiCallbacks {
+     // CURL read function called after getStreamData
+     CurlReadCallbackHookFunc curlReadCallbackHookFn;
+ 
++    /* Playreel payload budget persists across all PutMedia attempts. */
++    SbrecSenderPacer senderPacer;
++
+     ///////////////////////////////////////////////
+ };
+ typedef struct __CurlApiCallbacks* PCurlApiCallbacks;
+diff --git a/src/source/CurlApiCallbacks.c b/src/source/CurlApiCallbacks.c
+--- a/src/source/CurlApiCallbacks.c
++++ b/src/source/CurlApiCallbacks.c
+@@ -153,6 +153,15 @@ STATUS createCurlApiCallbacks(PCallbacksProvider pCallbacksProvider, PCHAR regio
+     pCurlApiCallbacks->producerCallbacks.customData = (UINT64) pCurlApiCallbacks;
+     pCurlApiCallbacks->producerCallbacks.clientShutdownFn = clientShutdownCurl;
+ 
++    /* Embedded pacing state lives until freeCurlApiCallbacks finishes shutdown.
++     * SRWLOCK needs no destruction; C7 retains the SDK owner until callbacks end. */
++    {
++        LARGE_INTEGER counter,frequency;
++        CHK(QueryPerformanceCounter(&counter) && QueryPerformanceFrequency(&frequency), STATUS_INTERNAL_ERROR);
++        CHK(sbrecSenderInit(&pCurlApiCallbacks->senderPacer,sbrecSenderDefaults(),
++                           (uint64_t)counter.QuadPart,(uint64_t)frequency.QuadPart), STATUS_INVALID_ARG);
++    }
++
+     // Append to the API callback chain
+     CHK_STATUS(addApiCallbacks((PClientCallbacks) pCallbacksProvider, (PApiCallbacks) pCurlApiCallbacks));
+ 
+@@ -2387,3 +2396,19 @@ CleanUp:
+     LEAVES();
+     return retStatus;
+ }
++
++// Playreel per-owner policy override before Kinesis client creation/requests.
++// The C++ factory passes the original callback owner, never a request or global.
++STATUS sbrecConfigureSender(PClientCallbacks client, UINT32 rate,UINT32 capacity,UINT32 quantum,UINT32 wait,UINT32 slice) {
++    PCallbacksProvider provider=(PCallbacksProvider)client;PCurlApiCallbacks curl=NULL;UINT32 i;
++    LARGE_INTEGER now,frequency;SbrecSenderConfig config={rate,capacity,quantum,wait,slice};
++    if(!provider || provider->clientCallbacks.customData!=(UINT64)provider)return STATUS_INVALID_ARG;
++    if(!QueryPerformanceCounter(&now)||!QueryPerformanceFrequency(&frequency)||
++       !sbrecSenderConfigValid(config,(uint64_t)frequency.QuadPart))return STATUS_INVALID_ARG;
++    for(i=0;i<provider->apiCallbacksCount;i++)
++        if(provider->pApiCallbacks[i].freeApiCallbacksFn==freeApiCallbacksCurl){
++            curl=(PCurlApiCallbacks)provider->pApiCallbacks[i].customData;break;
++        }
++    if(!curl || curl->streamingRequestCount || curl->senderPacer.granted || curl->senderPacer.waiters)return STATUS_INVALID_OPERATION;
++    return sbrecSenderInit(&curl->senderPacer,config,(uint64_t)now.QuadPart,(uint64_t)frequency.QuadPart)?STATUS_SUCCESS:STATUS_INVALID_ARG;
++}
+diff --git a/src/source/SbrecSenderPacing.h b/src/source/SbrecSenderPacing.h
+new file mode 100644
+--- /dev/null
++++ b/src/source/SbrecSenderPacing.h
+@@ -0,0 +1,100 @@
++#ifndef SBREC_SENDER_PACING_H
++#define SBREC_SENDER_PACING_H
++/* Playreel PutMedia payload pacing: internal SDK state, not the runner ABI.
++ * One owner covers concurrent/replacement uploads. No producer lock is held
++ * while waiting. Profile: media288KiB/s + logs32KiB/s + reserve64KiB/s.
++ * Logs allow a separate256KiB POST burst. None of this is a true wire cap. */
++#include <windows.h>
++#include <stdint.h>
++/* Optional compiler definitions configure this SDK build without a runner ABI change. */
++#ifndef SBREC_MEDIA_BPS
++#define SBREC_MEDIA_BPS (288u*1024u)
++#endif
++#ifndef SBREC_MEDIA_CREDIT
++#define SBREC_MEDIA_CREDIT 4096u
++#endif
++#ifndef SBREC_MEDIA_QUANTUM
++#define SBREC_MEDIA_QUANTUM 4096u
++#endif
++#ifndef SBREC_MEDIA_WAIT_MS
++#define SBREC_MEDIA_WAIT_MS 100u
++#endif
++#ifndef SBREC_MEDIA_SLICE_MS
++#define SBREC_MEDIA_SLICE_MS 2u
++#endif
++typedef struct { uint32_t bytesPerSecond,capacityBytes,readBytes,maximumWaitMs,sliceMs; } SbrecSenderConfig;
++typedef struct {
++    SRWLOCK lock;
++    SbrecSenderConfig config;
++    uint64_t last,frequency,remainder;
++    uint32_t credit,reserved;
++    volatile LONG waiters;
++    volatile LONG64 waits,cancelled,timeouts;
++    uint64_t granted,refunded,used;
++} SbrecSenderPacer;
++static __inline SbrecSenderConfig sbrecSenderDefaults(void) {
++    SbrecSenderConfig c={SBREC_MEDIA_BPS,SBREC_MEDIA_CREDIT,SBREC_MEDIA_QUANTUM,SBREC_MEDIA_WAIT_MS,SBREC_MEDIA_SLICE_MS};return c;
++}
++static __inline int sbrecSenderConfigValid(SbrecSenderConfig c,uint64_t frequency) {
++    if(!frequency || frequency>1000000000000ULL ||
++       c.bytesPerSecond<65536 || c.bytesPerSecond>4u*1024u*1024u ||
++       c.capacityBytes<512 || c.capacityBytes>16384 || c.readBytes<512 ||
++       c.readBytes>4096 || c.readBytes>c.capacityBytes || c.maximumWaitMs<20 ||
++       c.maximumWaitMs>100 || !c.sliceMs || c.sliceMs>5 || (uint64_t)c.readBytes*1000>(uint64_t)c.bytesPerSecond*(c.maximumWaitMs-c.sliceMs)) return 0;
++    return 1;
++}
++static __inline int sbrecSenderInit(SbrecSenderPacer* p,SbrecSenderConfig c,uint64_t now,uint64_t frequency) {
++    if(!p || !sbrecSenderConfigValid(c,frequency))return 0;
++    ZeroMemory(p,sizeof(*p));InitializeSRWLock(&p->lock);
++    p->config=c;p->last=now;p->frequency=frequency;return 1;
++}
++/* Called under the short accounting lock. Outstanding reads occupy capacity:
++ * idle time during a slow SDK read cannot become credit for another attempt. */
++static __inline int sbrecSenderRefill(SbrecSenderPacer* p,uint64_t now) {
++    uint64_t elapsed,add,numerator;uint32_t ceiling=p->config.capacityBytes-p->reserved;
++    /* Concurrent callers may sample QPC before taking this lock in reverse order. */
++    if(now<p->last)now=p->last;
++    elapsed=now-p->last;p->last=now;
++    if(elapsed>=p->frequency){p->credit=ceiling;p->remainder=0;}
++    else {
++        numerator=elapsed*p->config.bytesPerSecond+p->remainder;
++        add=numerator/p->frequency;p->remainder=numerator%p->frequency;
++        if(add>=ceiling-p->credit){p->credit=ceiling;p->remainder=0;}
++        else p->credit+=(uint32_t)add;
++    }
++    return 1;
++}
++static __inline int sbrecSenderReserve(SbrecSenderPacer* p,uint64_t now,uint32_t requested,uint32_t* grant) {
++    uint32_t n=requested<p->config.readBytes?requested:p->config.readBytes;int valid;
++    *grant=0;AcquireSRWLockExclusive(&p->lock);valid=sbrecSenderRefill(p,now);
++    if(valid && n && p->credit>=n){*grant=n;p->credit-=n;p->reserved+=n;p->granted+=n;}
++    ReleaseSRWLockExclusive(&p->lock);return valid;
++}
++static __inline int sbrecSenderFinish(SbrecSenderPacer* p,uint64_t now,uint32_t reserved,uint32_t used) {
++    int valid;uint32_t unused;
++    AcquireSRWLockExclusive(&p->lock);
++    valid=reserved<=p->reserved && used<=reserved && sbrecSenderRefill(p,now);
++    if(valid){unused=reserved-used;p->reserved-=reserved;p->credit+=unused;p->refunded+=unused;p->used+=used;}
++    ReleaseSRWLockExclusive(&p->lock);return valid;
++}
++/* Only curl/SDK transport threads call this bounded wait. The cancellation
++ * function reads request atomics; no Unity, socket, SDK producer or allocation. */
++static __inline int sbrecSenderAcquire(SbrecSenderPacer* p,uint32_t requested,
++                                      int (*cancel)(void*),void* context,uint32_t* grant) {
++    LARGE_INTEGER start,now;int waiting=0,result=0;
++    QueryPerformanceCounter(&start);*grant=0;
++    for(;;){
++        if(cancel(context)){InterlockedIncrement64(&p->cancelled);break;}
++        QueryPerformanceCounter(&now);
++        if(!sbrecSenderReserve(p,(uint64_t)now.QuadPart,requested,grant))break;
++        if(*grant){result=1;break;}
++        if((uint64_t)(now.QuadPart-start.QuadPart)*1000>=p->frequency*p->config.maximumWaitMs){
++            InterlockedIncrement64(&p->timeouts);break;
++        }
++        if(!waiting){waiting=1;InterlockedIncrement(&p->waiters);InterlockedIncrement64(&p->waits);}
++        Sleep(p->config.sliceMs);
++    }
++    if(waiting)InterlockedDecrement(&p->waiters);
++    return result;
++}
++#endif

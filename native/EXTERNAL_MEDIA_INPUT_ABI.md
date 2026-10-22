@@ -1,0 +1,34 @@
+# External rendered frames and mixed PCM (capability V1)
+
+C1 adds external sources to the existing native runner, encoder and kvssink path. The accepted runner ABI1 and generated-clock ABI2 layouts/exports stay unchanged. No gameplay capture, microphone, Steam, new producer, arbitrary pipeline or credential discovery is added. See `native-synthetic-runner.h` for the exact x64 Cdecl/noexcept structs and exports. `test-external-input.ps1` builds into a fresh `Temp/PlaytestRecording/C1-external-*` stage and uses the existing intercepted SDK fixture, never the production sink's network path. It does not publish or overwrite the accepted runtime/players.
+
+## Call and ownership contract
+
+1. Query `sbrec_runner_external_v1_info`: version1, input72bytes, status88bytes, observation72bytes, pack8. Required size/version fields must match on every call.
+2. Create a normal runner handle, then `sbrec_runner_enable_external_v1(handle,1)` while CREATED. This is mutually exclusive with generated-clock V2 scheduling estimates. Old generated mode remains the default.
+3. Use the existing start/settings/credential API. External mode accepts session duration1..14400seconds and cumulative encoded ingress limit up to4GiB; generated mode retains1..180seconds/64MiB. Start is a control-thread operation; it is not an audio callback API.
+4. Poll `sbrec_runner_external_status_v1` until ready1. Native startup allocates fixed pools and publishes originQpc/frequency. Both tracks use the same native QPC frequency/origin, sampled by the existing runner-clock API. A missing first submitted frame still triggers the existing bounded startup timeout.
+5. Submit `SbrecExternalInputV1` through `sbrec_runner_push_external_v1`. The caller owns valid readable input memory and must not modify it during the call. Native copies into a preallocated GStreamer pool; the caller may reuse/overwrite its entire buffer immediately after return. No pointer or raw payload is retained in observations/logs.
+6. Drain `sbrec_runner_drain_external_v1` frequently, then use existing asynchronous stop/status/release. Stop rejects later input; repeated stop is safe. Release remains BUSY while worker teardown is incomplete and rejects stale handles after release. SDK teardown can still take time; this capability does not promise a hard bounded DLL unload or redefine the existing host watchdog policy.
+
+## Formats and timestamps
+
+Video: INPUT_VIDEO, RGBA8 bytes in top-to-bottom row order, dimensions exactly matching start settings (even64..1280 by64..720), stride at least width*4 and at most8192, byte length spanning the last visible row but no more than stride*height. Audio fields must be0. Video duration is1ns..1s; caller should supply its nominal frame duration.
+
+Audio: INPUT_AUDIO, finite float32 little-endian, interleaved48000Hz stereo,1..4800 sample frames per packet (at most100ms/38400bytes). Width/height/stride/duration must be0; native derives duration from sample frames. Byte length must equal sampleFrames*2*sizeof(float), with float-aligned input. Other rates/channels and NaN/Inf are rejected rather than silently resampled or relabeled. The shared encoder branch converts to the existing S16LE AAC input.
+
+`captureQpc` labels the caller-reported first pixel/sample time. Both tracks derive PTS by integer scaling `(captureQpc-originQpc)*1e9/frequency`; there is no independent audio/video origin, wall-clock scheduling or timestamp rewriting. Capture time must not precede origin or lead submission by more than100ms, and the packet must fit within the configured session duration. Per-track timestamps must advance; overlap is rejected except at most one QPC tick of duration quantization (e.g.30fps versus100ns QPC ticks). Gaps beyond1us and prior rejected packets flag discontinuity. This preserves reported provenance, not a physical-capture attestation. INPUT_RENDERED/INPUT_AUDIO_MIX identify caller-supplied media; INPUT_GENERATED identifies the local fixture. Existing OBS_SOURCE timestamps are streaming-pad arrival observations. External mode does not generate synthetic scheduling FrameAnchorV2 records.
+
+## Bounds, drops and evidence
+
+There are three video pool buffers and sixteen audio pool buffers. At1280x720 these hold at most11673600 raw payload bytes total. Appsrc uses block=false, downstream leaking as a safety net, maximum queued video2/audio8, and an explicit admission check so overload becomes a counted BUSY/drop before push. Encoded queue and Producer SDK store bounds remain unchanged. No raw-frame queue, encoder or producer is duplicated.
+
+Hot submission uses try-lock admission and preallocated pool DONTWAIT; it never waits for encoding/network work. Copies are bounded by one visible RGBA frame or38400PCM bytes. This is a best-effort callback boundary, not a hard realtime/wait-free claim about OS scheduling or GStreamer's short internal locks. Do not spin/retry BUSY from the audio callback; drop and report it. Runtime changes, pool allocation, encoding and teardown remain off that callback.
+
+Status acceptedVideo/Audio counts raw admission only, not encoded/submitted/persisted/decoded footage. droppedVideo/Audio includes track-identified rejection after readiness; invalidInputs is its invalid-input subset. processContentionReturns is process-wide because registry contention can prevent identifying a run. Invalid/stale headers/handles and pre-ready/late calls return finite status without necessarily adding a per-run row. Caller-side rejection accounting is therefore also required. A fixed64-row input-observation ring retains reported capture QPC, actual submission QPC, derived PTS/duration, track, provenance, result and discontinuity; overflow increments observationDrops. Drain frequently and preserve loss counters. No source opening/tail, continuous coverage or cloud durability is inferred from input acceptance.
+
+## Local proof and C2 boundary
+
+The short fixture sends padded-stride red/blue RGBA halves and0.25-amplitude440Hz PCM through the actual exports, shared encoders and intercepted maintained SDK. It poisons the caller's pixel buffer after submission and decodes the resulting MKV to verify row/channel order and audio amplitude. Separate cases exercise overload, invalid formats, no-input timeout, stop/release/stale handles and the unchanged generated path. The existing media probe also decodes the retained file. These are generated local inputs, not Unity/gameplay or AWS proof.
+
+C2 still needs managed x64 layouts, admitted/consented ownership, correctly sized RGBA readback and48000Hz stereo float feed, the shared QPC contract, BUSY/drop accounting and frequent observation draining. The appsrc plugin, gstapp library dependency and audioconvert plugin are staged by the updated packaging closure when a later runtime is explicitly built/published. C1 itself leaves all accepted runtime/player artifacts intact.

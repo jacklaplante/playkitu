@@ -1,0 +1,13 @@
+{
+  "name": "Playreel.Client",
+  "references": [
+    "Unity.Newtonsoft.Json"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": true,
+  "allowUnsafeCode": false
+}

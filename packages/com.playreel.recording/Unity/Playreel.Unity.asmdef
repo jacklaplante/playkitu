@@ -1,0 +1,15 @@
+{
+  "name": "Playreel.Unity",
+  "references": [
+    "Playreel.Client",
+    "Playreel.Native",
+    "Playreel.Producer"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": false,
+  "allowUnsafeCode": false
+}

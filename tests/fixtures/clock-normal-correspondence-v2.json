@@ -1,0 +1,51 @@
+{
+  "Coverage": "selected observed points only",
+  "ManagedStopwatchProof": false,
+  "SessionId": "00000000-0000-4000-8000-000000000101",
+  "RunId": "355358fd-c0c9-4935-8965-75bcab066790",
+  "Schema": 2,
+  "CallerClock": "native_test_QPC_not_managed_Stopwatch",
+  "Mappings": [
+    {
+      "DecodedPtsNs": "1792087083350000000",
+      "DecodedBufferOrdinal": "31",
+      "QuantizationToleranceNs": "1000000",
+      "SessionElapsedNs": "6173554100",
+      "SdkPts100ns": "17920870833500769",
+      "ClockEpoch": "1",
+      "ScheduleQpc": "1337276141669",
+      "FrameOrdinal": "31",
+      "UncertaintyNs": "5273400",
+      "Evidence": "unique selected video point in this offline run/file; not continuous coverage",
+      "PlaybackStreamNs": "1000000000"
+    },
+    {
+      "DecodedPtsNs": "1792087084350000000",
+      "DecodedBufferOrdinal": "61",
+      "QuantizationToleranceNs": "1000000",
+      "SessionElapsedNs": "7177515600",
+      "SdkPts100ns": "17920870843500769",
+      "ClockEpoch": "1",
+      "ScheduleQpc": "1337286181284",
+      "FrameOrdinal": "61",
+      "UncertaintyNs": "2768000",
+      "Evidence": "unique selected video point in this offline run/file; not continuous coverage",
+      "PlaybackStreamNs": "2000000000"
+    },
+    {
+      "DecodedPtsNs": "1792087085350000000",
+      "DecodedBufferOrdinal": "91",
+      "QuantizationToleranceNs": "1000000",
+      "SessionElapsedNs": "8176076000",
+      "SdkPts100ns": "17920870853500769",
+      "ClockEpoch": "1",
+      "ScheduleQpc": "1337296166888",
+      "FrameOrdinal": "91",
+      "UncertaintyNs": "4528500",
+      "Evidence": "unique selected video point in this offline run/file; not continuous coverage",
+      "PlaybackStreamNs": "3000000000"
+    }
+  ],
+  "RunnerVariant": "packaged DLL",
+  "FileSHA256": "CCE9825419E70278B37D35D041232CCE102967ADE6736AF858EA240E412F970C"
+}

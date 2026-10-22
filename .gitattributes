@@ -1,0 +1,8 @@
+* text=auto eol=lf
+# Fixture provenance binds exact bytes, including their original line endings.
+tests/fixtures/*.json -text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

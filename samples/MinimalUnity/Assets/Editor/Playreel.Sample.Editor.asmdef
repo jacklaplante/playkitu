@@ -1,0 +1,5 @@
+{
+  "name": "Playreel.Sample.Editor",
+  "references": [],
+  "includePlatforms": ["Editor"]
+}

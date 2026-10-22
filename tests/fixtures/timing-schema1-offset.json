@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "00112233-4455-6677-8899-aabbccddeeff",
+  "admissionGeneration": 1,
+  "objectKind": "time-index",
+  "sequence": 0,
+  "sessionClock": { "clockId": "managed-stopwatch", "frequencyHz": 10000000, "startTicks": null, "sessionElapsedNs": 0, "utc": "2026-10-15T12:00:00.0000000+00:00", "uncertaintyNs": 200 },
+  "producerRuns": [
+    { "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "epoch": 0, "recordingStart": null, "ranges": {
+      "source:video:0": { "first": { "kind": "source", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 1, "epoch": 0, "track": "video", "flags": 0, "result": 0, "sourcePtsNs": 0,
+        "observationClock": { "qpc": 1168914037361, "frequencyHz": 10000000, "unix100ns": 17920702470041787, "uncertainty100ns": 1 } },
+        "last": { "kind": "source", "sequence": 1, "sourcePtsNs": 0 } },
+      "encoded:video:0": { "first": { "kind": "encoded", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 2, "epoch": 0, "track": "video", "flags": 0, "result": 0,
+        "gstPtsNs": 3600000000000000, "segmentStartNs": 3599999866088500, "segmentBaseNs": 0, "runningNs": 133911500 },
+        "last": { "kind": "encoded", "sequence": 2, "gstPtsNs": 3600000000000000, "segmentStartNs": 3599999866088500, "segmentBaseNs": 0, "runningNs": 133911500 } },
+      "submitted:video:0": { "first": { "kind": "submitted", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 3, "epoch": 0, "track": "video", "flags": 1, "result": 0,
+        "runningNs": 133911500, "sdkPts100ns": 17920702471528648, "captureMapping": "unavailable", "captureElapsedNs": null, "captureUncertaintyNs": null },
+        "last": { "kind": "submitted", "sequence": 3, "runningNs": 133911500, "sdkPts100ns": 17920702471528648, "captureMapping": "unavailable", "captureElapsedNs": null, "captureUncertaintyNs": null } }
+    } }
+  ],
+  "records": [
+    { "kind": "ack", "producerRunId": "11223344-5566-7788-99aa-bbccddeeff00", "sequence": 4, "epoch": 0, "flags": 3, "result": 0,
+      "ackType": 3, "upload": 18446744073709551614, "fragment": "913438523331814323926820631849", "ackTimecodeMs": 1792070247152 },
+    { "kind": "gap", "reason": "unknown_correspondence", "elapsedNs": null, "runningNs": null }
+  ],
+  "droppedRecords": 0,
+  "droppedRuns": 0,
+  "droppedObjects": 0,
+  "droppedLogBytes": 0
+}

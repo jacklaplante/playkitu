@@ -1,0 +1,23 @@
+{
+  "name": "Playreel.Tests",
+  "references": [
+    "Playreel.Client",
+    "Playreel.Native",
+    "Playreel.Gameplay",
+    "Playreel.Producer",
+    "Playreel.Unity",
+    "Playreel.Steam",
+    "Unity.Newtonsoft.Json"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ]
+}

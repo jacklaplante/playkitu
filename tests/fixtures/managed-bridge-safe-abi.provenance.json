@@ -1,0 +1,12 @@
+{
+  "test": "RecordingManagedClockTests.SafeNativeCapabilityAndActualManagedBracketWithoutSdkStart",
+  "provenance": "Actual Unity Editor managed Stopwatch/session-elapsed bracket around safe native ABI clock; CREATED only, no SDK start, no physical capture",
+  "clockRecordBytes": 256,
+  "nativeDllSha256": "4F2871122E916C33702A91D95ABBAE60F1C7E0AB24D0266C67208B24BD94E21D",
+  "joinedToNativeMediaFixtures": false,
+  "clockCapability": 2,
+  "nativeAbi": 1,
+  "sourceArtifact": "Historical generated managed ABI artifact; original location redacted; original artifact not distributed",
+  "fixtureSha256": "5822849890D7EF9152673A789DBC535E601599189EAF7E97B724E9387DF18686",
+  "liveExecuted": false
+}

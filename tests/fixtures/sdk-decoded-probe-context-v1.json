@@ -1,0 +1,17 @@
+{
+  "DemuxFirstVideoPtsNs": "1792073107910000000",
+  "ProducerRunId": "00000000-0000-4000-8000-000000000002",
+  "MissingOpeningOrTailPositionVerified": false,
+  "OffsetVerified": false,
+  "AcceptedVideoBuffers": "88",
+  "SdkFirstVideoPts100ns": "17920731079107534",
+  "Source": "accepted B2c intercepted SDK fixture; simulated ACKs",
+  "AcceptedAudioBuffers": "140",
+  "FragmentIdsAvailable": false,
+  "CandidateProducerMinusDemuxNs": "753400",
+  "DecodedAudioBuffers": "135",
+  "Reason": "Observed SDK/demux times compared, but first frame and fragment identity are not independently matched. No verified producer-to-playback anchor.",
+  "DecodedFirstVideoPtsNs": "1792073107910000000",
+  "DecodedVideoBuffers": "87",
+  "DecodedFirstAudioPtsNs": "1792073107927000000"
+}

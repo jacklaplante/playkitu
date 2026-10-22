@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Playreel.Issuer</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../packages/com.playreel.recording/Client/RecordingIdentity.cs" Link="RecordingIdentity.cs" />
+    <Compile Include="../../../packages/com.playreel.recording/Client/RecordingDiagnosticsLimits.cs" Link="RecordingDiagnosticsLimits.cs" />
+    <PackageReference Include="Amazon.Lambda.Core" Version="3.4.0" />
+    <PackageReference Include="Amazon.Lambda.APIGatewayEvents" Version="3.0.1" />
+    <PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" Version="3.0.1" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.102.11" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.107.3" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.101.4" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.100.19" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,398 @@
+diff --git a/src/gstreamer/gstkvssink.cpp b/src/gstreamer/gstkvssink.cpp
+--- a/src/gstreamer/gstkvssink.cpp
++++ b/src/gstreamer/gstkvssink.cpp
+@@ -59,6 +59,17 @@
+ #include "KvsSinkStreamCallbackProvider.h"
+ #include "KvsSinkClientCallbackProvider.h"
+ #include "KvsSinkDeviceInfoProvider.h"
++#include "native-session-credentials.h"
++#include "native-media-config.h"
++#include <DefaultCallbackProvider.h>
++extern "C" STATUS sbrecConfigureSender(PClientCallbacks,UINT32,UINT32,UINT32,UINT32,UINT32);
++#include "native-synthetic-media.h"
++extern "C" __declspec(dllexport) uint32_t __cdecl sbrec_synthetic_observer_abi_version() noexcept { return 1; }
++#ifdef SBREC_TEST_TRANSPORT
++extern "C" void sbrec_test_frame(uint64_t, uint32_t, uint32_t);
++extern "C" void sbrec_test_lifecycle_event(uint32_t);
++extern "C" uint32_t sbrec_test_retire_allowed();
++#endif
+ #include <IotCertCredentialProvider.h>
+ #include "Util/KvsSinkUtil.h"
+ 
+@@ -263,13 +274,18 @@ void closed(UINT64 custom_data, STREAM_HANDLE stream_handle, UPLOAD_HANDLE uploa
+ void kinesis_video_producer_init(GstKvsSink *kvssink)
+ {
+     auto data = kvssink->data;
++    // Explicit memory auth is selected before all ambient credential lookups.
++    bool memory_selected = false;
++    auto credential_provider = sbrec::injected_credentials(G_OBJECT(kvssink), memory_selected);
+ 
+     KVSSINK_THROW_IF_NULL(kvssink->stream_name);
+ 
++    const auto cert_override = static_cast<const char*>(g_object_get_data(G_OBJECT(kvssink), "sbrec-ca-path-v1"));
+     unique_ptr<DeviceInfoProvider> device_info_provider(new KvsSinkDeviceInfoProvider(kvssink->storage_size,
+                                                         kvssink->stop_stream_timeout,
+                                                         kvssink->service_connection_timeout,
+-                                                        kvssink->service_completion_timeout));
++                                                        kvssink->service_completion_timeout,
++                                                        memory_selected && cert_override ? cert_override : ""));
+     unique_ptr<ClientCallbackProvider> client_callback_provider(new KvsSinkClientCallbackProvider());
+     unique_ptr<StreamCallbackProvider> stream_callback_provider(new KvsSinkStreamCallbackProvider(data));
+ 
+@@ -295,6 +311,9 @@ void kinesis_video_producer_init(GstKvsSink *kvssink)
+ 
+     kvssink->data->kvs_sink = kvssink;
+ 
++    if (memory_selected) {
++        region_str = string(kvssink->aws_region);
++    } else {
+     if (0 == strcmp(kvssink->access_key, DEFAULT_ACCESS_KEY)) { // if no static credential is available in plugin property.
+         if (nullptr == (access_key = getenv(ACCESS_KEY_ENV_VAR))
+             || nullptr == (secret_key = getenv(SECRET_KEY_ENV_VAR))) { // if no static credential is available in env var.
+@@ -329,7 +348,7 @@ void kinesis_video_producer_init(GstKvsSink *kvssink)
+         region_str = string(default_region); // Use env var if both property and env var are available.
+     }
+ 
+-    unique_ptr<CredentialProvider> credential_provider;
++    // Legacy provider selection is retained only for callers without injection.
+ 
+     if (kvssink->iot_certificate) {
+         LOG_INFO("Using iot credential provider within KVS sink for " << kvssink->stream_name);
+@@ -378,17 +397,26 @@ void kinesis_video_producer_init(GstKvsSink *kvssink)
+         control_plane_uri_str = string(control_plane_uri);
+     }
+ 
++    } // No environment, credential file or IoT fallback on explicit memory path.
++
+     KVSSINK_THROW_IF_NULL(kvssink->user_agent);
+ 
+     LOG_INFO("User agent string: " << kvssink->user_agent);
+-    data->kinesis_video_producer = KinesisVideoProducer::createSync(std::move(device_info_provider),
+-                                                                    std::move(client_callback_provider),
+-                                                                    std::move(stream_callback_provider),
+-                                                                    std::move(credential_provider),
+-                                                                    API_CALL_CACHE_TYPE_ALL,
+-                                                                    region_str,
+-                                                                    control_plane_uri_str,
+-                                                                    kvssink->user_agent);
++    // Same SDK callback/producer creation path, configured before client/network
++    // initialization. The copied numeric Run options remain immutable until C7 retirement.
++    unique_ptr<DefaultCallbackProvider> callbacks(new DefaultCallbackProvider(
++        std::move(client_callback_provider),std::move(stream_callback_provider),std::move(credential_provider),
++        region_str,control_plane_uri_str,kvssink->user_agent,device_info_provider->getCustomUserAgent(),
++        device_info_provider->getCertPath(),API_CALL_CACHE_TYPE_ALL,DEFAULT_ENDPOINT_CACHE_UPDATE_PERIOD));
++    auto options=static_cast<const SbrecMediaConfigV1*>(g_object_get_data(G_OBJECT(kvssink),"sbrec-media-config-v1"));
++    if(options) {
++        if(!sbrec_valid_media(*options))throw std::runtime_error("Invalid recorder media config");
++        auto client=callbacks->getCallbacks();
++        auto status=sbrecConfigureSender(reinterpret_cast<PClientCallbacks>(client.customData),
++            options->mediaBps,options->creditBytes,options->readBytes,options->waitMs,options->sliceMs);
++        if(STATUS_FAILED(status))throw std::runtime_error("Recorder sender config rejected");
++    }
++    data->kinesis_video_producer=KinesisVideoProducer::createSync(std::move(device_info_provider),std::move(callbacks));
+ }
+ 
+ void create_kinesis_video_stream(GstKvsSink *kvssink) {
+@@ -488,12 +516,20 @@ bool kinesis_video_stream_init(GstKvsSink *kvssink, string &err_msg) {
+     int retry_delay = DEFAULT_INITIAL_RETRY_DELAY_MS;
+     bool do_retry = true;
+     while(do_retry) {
++        if (sbrec_cancelled(G_OBJECT(kvssink))) {
++            err_msg = "Generated runner stopped";
++            return false;
++        }
+         try {
+             LOG_INFO("Try creating stream for " << kvssink->stream_name);
+             // stream is freed when createStreamSync fails
+             create_kinesis_video_stream(kvssink);
+             break;
+         } catch (runtime_error &err) {
++            if (sbrec_cancelled(G_OBJECT(kvssink))) {
++                err_msg = "Generated runner stopped";
++                return false;
++            }
+             ostringstream oss;
+             oss << "Failed to create stream. Error: " << err.what();
+             err_msg = oss.str();
+@@ -785,9 +821,44 @@ gst_kvs_sink_init(GstKvsSink *kvssink) {
+     LOG_CONFIGURE_STDOUT("DEBUG");
+ }
+ 
++// C7: break data -> producer -> callback provider -> data before freeing
++// the sink. SDK teardown runs while callbacks can still use the sink, its strings
++// and the recorder observer. stopSync alone does not destroy SDK/curl ownership.
++extern "C" __declspec(dllexport) uint32_t __cdecl sbrec_sink_retire(GstElement *element) noexcept {
++    try {
++#ifdef SBREC_TEST_TRANSPORT
++        if (!sbrec_test_retire_allowed()) return 1;
++#endif
++        auto *sink = GST_KVS_SINK(element);
++        auto data = sink->data; // pin callback custom data while breaking its cycle
++        if (data) {
++#ifdef SBREC_TEST_TRANSPORT
++            sbrec_test_lifecycle_event(3);
++#endif
++            // Producer owns its active streams too; release this extra reference
++            // first, then let its maintained destructor shut down streams/client/
++            // callback provider. No deadline or forced callback/thread termination.
++            data->kinesis_video_stream.reset();
++            data->kinesis_video_producer.reset();
++            data->kvs_sink = nullptr;
++#ifdef SBREC_TEST_TRANSPORT
++            sbrec_test_lifecycle_event(4);
++#endif
++        }
++        g_object_set_data(G_OBJECT(sink), "sbrec-observer-v1", nullptr);
++        return 0;
++    } catch (...) { return 1; } // caller retains sink/observer/module on failure
++}
++
+ static void
+ gst_kvs_sink_finalize(GObject *object) {
+     GstKvsSink *kvssink = GST_KVS_SINK (object);
++#ifdef SBREC_TEST_TRANSPORT
++    sbrec_test_lifecycle_event(5);
++#endif
++    // The recorder holds a strong sink reference and explicitly retires before
++    // unref. Ordinary plugin users also retire on READY->NULL below.
++    g_assert(!kvssink->data || !kvssink->data->kinesis_video_producer);
+ 
+     gst_object_unref(kvssink->collect);
+     g_free(kvssink->stream_name);
+@@ -813,6 +884,11 @@ gst_kvs_sink_finalize(GObject *object) {
+ 
+     // Reset the smart pointers to properly release the data
+     kvssink->credentials_.reset();
++#ifdef SBREC_TEST_TRANSPORT
++    // After SDK destruction only the sink may own its custom data; the old
++    // producer/callback cycle leaves at least one additional shared reference.
++    if (kvssink->data.use_count() != 1) sbrec_test_lifecycle_event(6);
++#endif
+     kvssink->data.reset();
+ 
+     if (kvssink->data.use_count() > 0) {
+@@ -1303,6 +1379,7 @@ gst_kvs_sink_handle_buffer (GstCollectPads * pads,
+     STATUS put_frame_status = STATUS_SUCCESS;
+ 
+     info.data = NULL;
++    const guint64 source_running_ns = buf ? buf->pts : GST_CLOCK_TIME_NONE;
+ 
+     if (STATUS_FAILED(stream_status)) {
+         // in offline case, we cant tell the pipeline to restream the file again in case of network outage.
+@@ -1316,6 +1393,8 @@ gst_kvs_sink_handle_buffer (GstCollectPads * pads,
+         } else {
+             // resetStream, note that this will flush out producer buffer
+             data->kinesis_video_stream->resetStream();
++            SbrecSdkEvent reset; reset.kind = SBREC_RESET;
++            sbrec_emit(G_OBJECT(kvssink), reset);
+             // reset state
+             data->stream_status = STATUS_SUCCESS;
+         }
+@@ -1384,7 +1463,20 @@ gst_kvs_sink_handle_buffer (GstCollectPads * pads,
+             }
+ 
+             if (!data->use_original_pts) {
+-                buf->pts += data->producer_start_time - data->first_pts;
++                // SDK FrameOrderCoordinator compares quantized absolute PTS,
++                // while ContentView/MKV validate relative DTS. A fractional-grid
++                // UTC offset can tie PTS across a DTS-bin boundary and invert A/V
++                // order (0x30000005 / 0x32000002). Keep one common integral-grid
++                // offset: source intervals/gaps and encoder DTS remain unchanged.
++                const uint64_t gridNs = uint64_t(kvssink->timecode_scale_milliseconds) *
++                    HUNDREDS_OF_NANOS_IN_A_MILLISECOND * DEFAULT_TIME_UNIT_IN_NANOS;
++                uint64_t translatedPts;
++                if (!sbrec_sdk_utc_pts_ns(data->producer_start_time, data->first_pts, buf->pts, gridNs, translatedPts)) {
++                    GST_ELEMENT_ERROR(kvssink, STREAM, FAILED, (NULL), ("Invalid SDK UTC timestamp mapping"));
++                    ret = GST_FLOW_ERROR;
++                    goto CleanUp;
++                }
++                buf->pts = translatedPts;
+             } else {
+                 buf->pts = buf->dts;
+             }
+@@ -1393,6 +1485,14 @@ gst_kvs_sink_handle_buffer (GstCollectPads * pads,
+         put_frame_status = put_frame(data, info.data, info.size,
+                                      std::chrono::nanoseconds(buf->pts),
+                                      std::chrono::nanoseconds(buf->dts), kinesis_video_flags, track_id, data->frame_count);
++        SbrecSdkEvent accepted; accepted.kind = SBREC_FRAME;
++        accepted.track = kvs_sink_track_data->track_type == MKV_TRACK_INFO_TYPE_VIDEO ? 1 : 2;
++        accepted.flags = static_cast<uint32_t>(kinesis_video_flags); accepted.result = put_frame_status;
++        accepted.inputRunningNs = source_running_ns; accepted.sdkPts100ns = buf->pts / DEFAULT_TIME_UNIT_IN_NANOS;
++        accepted.bytes = info.size; sbrec_emit(G_OBJECT(kvssink), accepted);
++#ifdef SBREC_TEST_TRANSPORT
++        sbrec_test_frame(accepted.sdkPts100ns, accepted.track, accepted.flags);
++#endif
+         data->frame_count++;
+     } else {
+         LOG_WARN("GStreamer buffer is invalid for " << kvssink->stream_name);
+@@ -1660,7 +1760,13 @@ gst_kvs_sink_change_state(GstElement *element, GstStateChange transition) {
+     // Upward transitions
+     switch (transition) {
+         case GST_STATE_CHANGE_NULL_TO_READY:
+-            if (kvssink->log_config_path != NULL) {
++            if (g_object_get_data(G_OBJECT(kvssink), "sbrec-observer-v1")) {
++                // Dedicated generated-only harness owns this SDK instance. Avoid
++                // ambient log files and per-frame SDK log growth; fixed POD
++                // observations carry redacted diagnostics instead.
++                log4cplus::initialize();
++                log4cplus::Logger::getRoot().setLogLevel(log4cplus::OFF_LOG_LEVEL);
++            } else if (kvssink->log_config_path != NULL) {
+                 log4cplus::initialize();
+                 log4cplus::PropertyConfigurator::doConfigure(kvssink->log_config_path);
+                 LOG_INFO("Logger config being used: " << kvssink->log_config_path);
+@@ -1674,9 +1780,9 @@ gst_kvs_sink_change_state(GstElement *element, GstStateChange transition) {
+                 kvssink->data->first_pts = GST_CLOCK_TIME_NONE;
+                 kvssink->data->producer_start_time = GST_CLOCK_TIME_NONE;
+ 
+-            } catch (runtime_error &err) {
+-                oss << "Failed to init kvs producer. Error: " << err.what();
+-                err_msg = oss.str();
++            } catch (...) {
++                // Keep exceptions and sensitive exception text inside this GStreamer C boundary.
++                err_msg = "Failed to initialize KVS producer";
+                 ret = GST_STATE_CHANGE_FAILURE;
+                 goto CleanUp;
+             }
+@@ -1708,10 +1814,16 @@ gst_kvs_sink_change_state(GstElement *element, GstStateChange transition) {
+     // Downward transitions
+     switch (transition) {
+         case GST_STATE_CHANGE_PAUSED_TO_READY:
+-            data->kinesis_video_stream->stopSync();
++            // A cancelled/failed READY->PAUSED initialization owns no stream.
++            if (data->kinesis_video_stream) data->kinesis_video_stream->stopSync();
+             LOG_INFO("Stopped kvssink for " << kvssink->stream_name);
+             break;
+         case GST_STATE_CHANGE_READY_TO_NULL:
++            if (sbrec_sink_retire(element) != 0) {
++                ret = GST_STATE_CHANGE_FAILURE;
++                err_msg = "native_sink_retirement_failed";
++                break;
++            }
+             LOG_INFO("Pipeline state changed to NULL in kvssink");
+             break;
+         default:
+@@ -1751,3 +1863,6 @@ GST_PLUGIN_DEFINE (
+         "GStreamer",
+         "http://gstreamer.net/"
+ )
++
++// Capability gate: new runner configurations cannot silently use an old SDK plugin.
++extern "C" __declspec(dllexport) uint32_t __cdecl sbrec_media_config_version() noexcept { return 1; }
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -209,6 +209,29 @@ if(BUILD_GSTREAMER_PLUGIN)
+     add_library(gstkvssink MODULE ${GST_PLUGIN_SOURCE_FILES})
+   endif()
+   target_link_libraries(gstkvssink PRIVATE ${GST_APP_LIBRARIES} KinesisVideoProducer)
++  # Playreel B2a: only explicit, bounded in-memory credentials; AWS owns auth/signing.
++  if(NOT EXISTS "${SBREC_SOURCE_DIR}/native-session-credentials.cpp")
++    message(FATAL_ERROR "Pinned Playreel credential provider source missing")
++  endif()
++  target_sources(gstkvssink PRIVATE "${SBREC_SOURCE_DIR}/native-session-credentials.cpp")
++  target_include_directories(gstkvssink PRIVATE "${SBREC_SOURCE_DIR}")
++  target_compile_features(gstkvssink PRIVATE cxx_std_17)
++  add_executable(native-credentials-tests "${SBREC_SOURCE_DIR}/tests/native-session-credentials.cpp" "${SBREC_SOURCE_DIR}/native-session-credentials.cpp")
++  target_include_directories(native-credentials-tests PRIVATE "${SBREC_SOURCE_DIR}")
++  target_compile_features(native-credentials-tests PRIVATE cxx_std_17)
++  target_link_libraries(native-credentials-tests PRIVATE ${GST_APP_LIBRARIES} KinesisVideoProducer)
++  target_sources(native-credentials-tests PRIVATE "${SBREC_SOURCE_DIR}/tests/sdk-logging.cpp" "${SBREC_SOURCE_DIR}/tests/sdk-response-offline.c")
++  target_include_directories(native-credentials-tests PRIVATE "${KinesisVideoProducerC_SOURCE_DIR}/src/source")
++  # Test-only SDK transport interception. Never installed or packaged: same SDK
++  # signing/state/MKV/ACK code, with Response.c curl I/O replaced before sockets.
++  add_library(gstkvssink-offline MODULE ${GST_PLUGIN_SOURCE_FILES}
++      "${SBREC_SOURCE_DIR}/native-session-credentials.cpp"
++      "${SBREC_SOURCE_DIR}/tests/runner-response-offline.c")
++  target_include_directories(gstkvssink-offline PRIVATE "${SBREC_SOURCE_DIR}" "${KinesisVideoProducerC_SOURCE_DIR}/src/source")
++  target_compile_features(gstkvssink-offline PRIVATE cxx_std_17)
++  target_compile_definitions(gstkvssink-offline PRIVATE SBREC_TEST_TRANSPORT=1)
++  target_link_libraries(gstkvssink-offline PRIVATE ${GST_APP_LIBRARIES} KinesisVideoProducer)
++  set_target_properties(gstkvssink-offline PROPERTIES OUTPUT_NAME gstkvssink LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/offline" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/offline")
+ 
+   add_executable(kvssink_gstreamer_sample samples/kvssink_gstreamer_sample.cpp)
+   target_link_libraries(kvssink_gstreamer_sample ${GST_APP_LIBRARIES} KinesisVideoProducer)
+diff --git a/src/gstreamer/KvsSinkDeviceInfoProvider.h b/src/gstreamer/KvsSinkDeviceInfoProvider.h
+--- a/src/gstreamer/KvsSinkDeviceInfoProvider.h
++++ b/src/gstreamer/KvsSinkDeviceInfoProvider.h
+@@ -9,15 +9,16 @@ namespace com { namespace amazonaws { namespace kinesis { namespace video {
+         uint64_t stop_stream_timeout_sec_;
+         uint64_t service_call_connection_timeout_sec_;
+         uint64_t service_call_completion_timeout_sec_;
++        std::string cert_override_;
+     public:
+         KvsSinkDeviceInfoProvider(uint64_t storage_size_mb,
+                                   uint64_t stop_stream_timeout_sec,
+                                   uint64_t service_call_connection_timeout_sec,
+-                                  uint64_t service_call_completion_timeout_sec):
++                                  uint64_t service_call_completion_timeout_sec, std::string cert_override = ""):
+                 storage_size_mb_(storage_size_mb),
+                 stop_stream_timeout_sec_(stop_stream_timeout_sec),
+                 service_call_connection_timeout_sec_(service_call_connection_timeout_sec),
+-                service_call_completion_timeout_sec_(service_call_completion_timeout_sec) {}
++                service_call_completion_timeout_sec_(service_call_completion_timeout_sec), cert_override_(std::move(cert_override)) {}
+         device_info_t getDeviceInfo() override;
+         const std::string getCertPath() override;
+     };
+diff --git a/src/gstreamer/KvsSinkDeviceInfoProvider.cpp b/src/gstreamer/KvsSinkDeviceInfoProvider.cpp
+--- a/src/gstreamer/KvsSinkDeviceInfoProvider.cpp
++++ b/src/gstreamer/KvsSinkDeviceInfoProvider.cpp
+@@ -5,6 +5,13 @@ using namespace com::amazonaws::kinesis::video;
+ 
+ KvsSinkDeviceInfoProvider::device_info_t KvsSinkDeviceInfoProvider::getDeviceInfo(){
+     auto device_info = DefaultDeviceInfoProvider::getDeviceInfo();
++    if (!cert_override_.empty()) {
++        device_info.clientInfo.loggerLogLevel = LOG_LEVEL_SILENT;
++        // Real SDK sync creation controls. These bound each attempt, not the
++        // entire upstream retry chain or destruction; host deadline still wins.
++        device_info.clientInfo.createClientTimeout = 2 * HUNDREDS_OF_NANOS_IN_A_SECOND;
++        device_info.clientInfo.createStreamTimeout = 2 * HUNDREDS_OF_NANOS_IN_A_SECOND;
++    }
+     // Set the storage size to user specified size in MB
+     device_info.storageInfo.storageSize = static_cast<UINT64>(storage_size_mb_) * 1024 * 1024;
+     device_info.clientInfo.stopStreamTimeout = static_cast<UINT64>(stop_stream_timeout_sec_ * HUNDREDS_OF_NANOS_IN_A_SECOND);
+@@ -14,6 +21,7 @@ KvsSinkDeviceInfoProvider::device_info_t KvsSinkDeviceInfoProvider::getDeviceInf
+ }
+ 
+ const std::string KvsSinkDeviceInfoProvider::getCertPath() {
++    if (!cert_override_.empty()) return cert_override_;
+     static const std::string cert_path = []() {
+         const char* env_path = std::getenv("KVSSINK_CA_CERT_PATH");
+         return env_path != nullptr ? std::string(env_path) : "";
+diff --git a/src/gstreamer/KvsSinkStreamCallbackProvider.cpp b/src/gstreamer/KvsSinkStreamCallbackProvider.cpp
+--- a/src/gstreamer/KvsSinkStreamCallbackProvider.cpp
++++ b/src/gstreamer/KvsSinkStreamCallbackProvider.cpp
+@@ -1,4 +1,5 @@
+ #include "KvsSinkStreamCallbackProvider.h"
++#include "native-synthetic-media.h"
+ 
+ LOGGER_TAG("com.amazonaws.kinesis.video.gstkvs");
+ 
+@@ -46,6 +47,8 @@ KvsSinkStreamCallbackProvider::droppedFrameReportHandler(UINT64 custom_data,
+                                                          UINT64 dropped_frame_timecode) {
+     UNUSED_PARAM(custom_data);
+     LOG_WARN("Reported droppedFrame callback for stream handle " << stream_handle << ". Dropped frame timecode in 100ns: " << dropped_frame_timecode);
++    auto data = reinterpret_cast<KvsSinkCustomData*>(custom_data);
++    if (data && data->kvs_sink) { SbrecSdkEvent e; e.kind = SBREC_GAP; e.sdkPts100ns = dropped_frame_timecode; sbrec_emit(G_OBJECT(data->kvs_sink), e); }
+     return STATUS_SUCCESS; // continue streaming
+ }
+ 
+@@ -55,6 +58,8 @@ KvsSinkStreamCallbackProvider::droppedFragmentReportHandler(UINT64 custom_data,
+                                                             UINT64 dropped_fragment_timecode) {
+     UNUSED_PARAM(custom_data);
+     LOG_WARN("Reported droppedFrame callback for stream handle " << stream_handle << ". Dropped fragment timecode in 100ns: " << dropped_fragment_timecode);
++    auto data = reinterpret_cast<KvsSinkCustomData*>(custom_data);
++    if (data && data->kvs_sink) { SbrecSdkEvent e; e.kind = SBREC_GAP; e.sdkPts100ns = dropped_fragment_timecode; sbrec_emit(G_OBJECT(data->kvs_sink), e); }
+     return STATUS_SUCCESS; // continue streaming
+ }
+ 
+@@ -88,6 +93,10 @@ KvsSinkStreamCallbackProvider::fragmentAckReceivedHandler(UINT64 custom_data,
+     auto customDataObj = reinterpret_cast<KvsSinkCustomData*>(custom_data);
+ 
+     if(customDataObj != NULL && customDataObj->kvs_sink != NULL && pFragmentAck != NULL) {
++        SbrecSdkEvent e; e.kind = SBREC_ACK; e.flags = pFragmentAck->ackType;
++        e.upload = upload_handle; e.timecodeMs = pFragmentAck->timestamp; e.result = pFragmentAck->result;
++        strncpy(e.fragment, pFragmentAck->sequenceNumber, sizeof(e.fragment)-1);
++        sbrec_emit(G_OBJECT(customDataObj->kvs_sink), e);
+         LOG_TRACE("[" << customDataObj->kvs_sink->stream_name << "] Ack timestamp for " <<  pFragmentAck->ackType << " is " << pFragmentAck->timestamp);
+         g_signal_emit(G_OBJECT(customDataObj->kvs_sink), customDataObj->ack_signal_id, 0, pFragmentAck);
+     }

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "sessionId": "57fc26b0-a2bb-4faf-a5db-1a9d6b6499ac",
+  "admissionGeneration": 1,
+  "objectKind": "time-index",
+  "sequence": 0,
+  "sessionClock": {
+    "clockId": "managed-stopwatch",
+    "frequencyHz": 10000000,
+    "sessionElapsedNs": 0,
+    "utc": "2026-10-15T14:36:45.9170894-04:00",
+    "uncertaintyNs": 0,
+    "startTicks": null
+  },
+  "droppedRecords": 0,
+  "droppedRuns": 0,
+  "droppedObjects": 0,
+  "droppedLogBytes": 0,
+  "producerRuns": [
+    {
+      "producerRunId": "42a6368f-abde-4fe5-8fc0-e97652c10502",
+      "epoch": 0,
+      "ranges": {},
+      "clockCorrespondence": {
+        "kind": "clock",
+        "producerRunId": "42a6368f-abde-4fe5-8fc0-e97652c10502",
+        "sequence": 0,
+        "epoch": 0,
+        "track": null,
+        "flags": 0,
+        "result": 0,
+        "bytes": null,
+        "droppedObservations": null,
+        "observationClock": {
+          "qpc": 1360503178394,
+          "frequencyHz": 10000000,
+          "unix100ns": 17920894059175585,
+          "uncertainty100ns": 5
+        },
+        "managedTicks": 877737065529,
+        "managedFrequencyHz": 10000000,
+        "managedAfterTicks": 877737065576,
+        "correspondenceQpc": 1360503178394,
+        "correspondenceUncertainty100ns": 52,
+        "managedBeforeElapsedNs": 402500,
+        "managedAfterElapsedNs": 412100
+      }
+    }
+  ],
+  "records": [
+    {
+      "kind": "clock",
+      "producerRunId": "42a6368f-abde-4fe5-8fc0-e97652c10502",
+      "sequence": 0,
+      "epoch": 0,
+      "track": null,
+      "flags": 0,
+      "result": 0,
+      "bytes": null,
+      "droppedObservations": null,
+      "observationClock": {
+        "qpc": 1360503178394,
+        "frequencyHz": 10000000,
+        "unix100ns": 17920894059175585,
+        "uncertainty100ns": 5
+      },
+      "managedTicks": 877737065529,
+      "managedFrequencyHz": 10000000,
+      "managedAfterTicks": 877737065576,
+      "correspondenceQpc": 1360503178394,
+      "correspondenceUncertainty100ns": 52,
+      "managedBeforeElapsedNs": 402500,
+      "managedAfterElapsedNs": 412100
+    }
+  ]
+}

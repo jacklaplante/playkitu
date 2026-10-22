@@ -1,0 +1,17 @@
+{
+  "name": "Playreel.Gameplay",
+  "references": [
+    "Playreel.Client",
+    "Playreel.Native",
+    "Playreel.Producer",
+    "Playreel.Unity",
+    "Unity.Collections"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": false,
+  "allowUnsafeCode": true
+}

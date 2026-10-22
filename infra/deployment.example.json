@@ -1,0 +1,10 @@
+{
+  "awsAccountId": "123456789012",
+  "awsRegion": "us-east-2",
+  "steamAppId": 123456,
+  "project": "playreel",
+  "rolePath": "/playreel/",
+  "alertEmail": "alerts@example.invalid",
+  "identityPrefix": "prrec2:",
+  "identityDomain": "playreel-recording:"
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">playreel</title>
+  <desc id="desc">Playtest recordings for more playful games. A play button surrounded by colorful little frames.</desc>
+  <rect width="1200" height="300" rx="28" fill="#171b2c"/>
+  <circle cx="1035" cy="10" r="155" fill="#252a43"/>
+  <circle cx="1190" cy="300" r="175" fill="#202c3b"/>
+  <g transform="translate(875 150)">
+    <rect x="-62" y="-93" width="113" height="85" rx="16" fill="#f4b9d4" transform="rotate(-15)"/>
+    <rect x="-2" y="-30" width="128" height="95" rx="16" fill="#9ce0cc" transform="rotate(12)"/>
+    <rect x="-65" y="-47" width="126" height="100" rx="20" fill="#ffd879"/>
+    <path d="M-19-23 23 3-19 29Z" fill="#24283d" stroke="#24283d" stroke-linejoin="round" stroke-width="8"/>
+    <circle cx="-99" cy="62" r="8" fill="#9ce0cc"/>
+    <circle cx="113" cy="-76" r="7" fill="#ffd879"/>
+    <path d="m-112-64 7-13 7 13 13 7-13 7-7 13-7-13-13-7Z" fill="#f4b9d4"/>
+  </g>
+  <text x="66" y="158" fill="#fff8e8" font-family="Trebuchet MS,Arial,sans-serif" font-size="100" font-weight="700" letter-spacing="-5">playreel</text>
+  <text x="72" y="216" fill="#c7cedf" font-family="Trebuchet MS,Arial,sans-serif" font-size="26">Playtest recordings for more playful games.</text>
+</svg>

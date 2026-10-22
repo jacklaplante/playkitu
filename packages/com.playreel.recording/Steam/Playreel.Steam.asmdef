@@ -1,0 +1,12 @@
+{
+  "name": "Playreel.Steam",
+  "references": [
+    "Playreel.Client"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": true,
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ]
+}

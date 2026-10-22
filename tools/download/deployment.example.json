@@ -1,0 +1,22 @@
+{
+  "awsAccountId": "123456789012",
+  "awsRegion": "us-east-2",
+  "steamAppId": 123456,
+  "issuerOrigin": "https://abc123def4.execute-api.us-east-2.amazonaws.com",
+  "project": "playreel",
+  "rolePath": "/playreel/",
+  "streamNamePrefix": "playreel-slot-",
+  "table": "playreel-sessions",
+  "uploadBucket": "playreel-123456789012-us-east-2",
+  "publisherSecretArn": "arn:aws:secretsmanager:us-east-2:123456789012:secret:playreel/publisher-key-AbCd12",
+  "mediaRoleArn": "arn:aws:iam::123456789012:role/playreel/playreel-media",
+  "retrievalRoleArn": "arn:aws:iam::123456789012:role/playreel/playreel-retrieval",
+  "streamArns": [
+    "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-01/1700000000000",
+    "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-02/1700000000000",
+    "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-03/1700000000000",
+    "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-04/1700000000000"
+  ],
+  "identityPrefix": "prrec2:",
+  "identityDomain": "playreel-recording:"
+}

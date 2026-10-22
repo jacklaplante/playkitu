@@ -1,0 +1,5 @@
+Install Steamworks.NET in the host project separately. Rename `SteamworksTicketBackend.cs.txt` to `.cs` in a host assembly referencing `Playreel.Steam`, `Playreel.Client` and your Steamworks.NET assembly. This example is opt-in source, not compiled by package import.
+
+After the game initializes Steam, own a `SteamWebTicketClient(new SteamworksTicketBackend(() => YourSteamOwner.IsInitialized))`. Supply `new SteamRecordingTickets(ticketOwner)` and `() => (uint)SteamUtils.GetAppID()` to `UnityRecordingFactory`. Continue your existing Steam callback pump. Dispose the ticket owner only after recording/admission drains. The adapter never calls SteamAPI.Init, SteamAPI.Shutdown or a game login endpoint.
+
+Construct the factory with your trusted deployment settings and packaged native runtime; call `PlayreelRecorder.Begin` only after disclosure/required consent. Calling Begin with false consent does not request a ticket. Optional microphone consent must remain separate. Real Steam admission is a later consented integration test; the minimal project never requests a real ticket.
