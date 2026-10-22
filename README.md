@@ -1,9 +1,13 @@
 <p align="center"><img src="docs/assets/banner.svg" alt="playreel: playtest recordings for more playful games" width="960" /></p>
 
 <p align="center"><strong>Gameplay, game audio, optional voice, and the logs that explain what happened.</strong></p>
-<p align="center">Unity · Windows x64 · Steam · Your AWS account</p>
+<p align="center"><strong>Free and open source</strong> · Unity · Windows 64-bit (x86-64) only · Steam</p>
 
 playreel helps developers see their game through a playtester's eyes. Players consent and play. Recordings stream while the game runs, and matching diagnostic logs give developers context for improving the game.
+
+**Free and open source:** the original project code is [MIT licensed](LICENSE). There is no playreel subscription or software fee. You deploy the backend in your own AWS account and pay its infrastructure and usage costs.
+
+**Recording support: Windows 64-bit (x86-64) only.** The Unity recording client and native runtime currently support this platform. macOS, Linux, 32-bit Windows and native ARM64 players are unsupported. This platform restriction applies to the recording client; the supplied backend runs on AWS.
 
 **Experimental, source-first release.** Independent Unity import, lifecycle, native, backend, download and infrastructure checks pass. A small Windows IL2CPP sample also passes native loading and cleanup. A freshly deployed end-to-end installation and clean-machine support remain release checks. Prebuilt native binaries are not distributed here.
 
@@ -77,7 +81,7 @@ GStreamer, Windows Media Foundation and AWS's producer SDK provide the native me
 | Area | Initial scope |
 | --- | --- |
 | Unity | 2022.3.62f3 baseline; other versions need validation |
-| Player | Windows x64; IL2CPP native-load self-check demonstrated |
+| Player | Windows 64-bit (x86-64) only; IL2CPP native-load self-check demonstrated |
 | Authentication | Steam tickets and app ownership |
 | Deployment | One configured app/account/region per AWS deployment |
 | Sessions | Up to four hours, followed by bounded diagnostic finalization |
