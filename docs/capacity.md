@@ -1,5 +1,9 @@
 # Recording capacity
 
+For the proposed replacement of this pool with one stream per recording, see
+[on-demand recordings](on-demand-recordings.md). It is not implemented yet; the
+limits below still describe the maintained code.
+
 `videoStreamCount` in the owner-authored `infra/deployment.json` is the single
 deployment setting for the shared video pool. It defaults to **4** when omitted;
 the supported range is **1–8**. Terraform stream creation, prepared owner
