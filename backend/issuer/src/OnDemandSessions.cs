@@ -90,8 +90,12 @@ public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions opti
         }
         throw new IssuerError(429, "issuer_busy", 2);
     }
+    // Existing protocol-v1 clients require null deadlines in a pending response.
+    // Capacity/deadlines are already frozen in storage while AWS prepares the
+    // stream, but publish them only with active/leased admission, never early.
     public static StartResult Result(SessionState s) => new(s.SessionId, s.Status == "preparing" ? "pending" : s.Status,
-        s.Generation, s.EndsAt, s.Status == "active" ? "leased" : "not_started", s.Status is "pending" or "preparing" ? 2 : null, s.MetadataUntilUtc);
+        s.Generation, s.Status == "preparing" ? null : s.EndsAt, s.Status == "active" ? "leased" : "not_started",
+        s.Status is "pending" or "preparing" ? 2 : null, s.Status == "preparing" ? null : s.MetadataUntilUtc);
 
     public static ActiveReference Authenticate(SessionState s, DateTimeOffset now)
     {
