@@ -66,6 +66,12 @@ appropriate Windows hardware; it does not open a microphone or recording device.
 The intercepted plugin and negative capability DLL are test-only and never enter
 the runtime package. Results are JSON and logs in unique ignored directories.
 
+For patch setup changes alone, run `pwsh -NoProfile -File native/test-patches.ps1`.
+It uses small copies of the prepared SDK sources to check fresh Git checkouts,
+archive layouts, repeated application, CRLF input and rejected-source integrity;
+it does not rebuild the native runtime. Patching resolves the enclosing Git root
+so Git cannot silently skip absolute SDK paths from a nested working directory.
+
 `test-clock.ps1` exercises generated timing/selected-frame decode separately;
 `test-lifecycle.ps1` includes a prior-defect negative control. Shared historical
 synthetic fixtures live only in `../tests/fixtures/` and are not fresh runtime

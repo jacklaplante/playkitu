@@ -5,11 +5,13 @@ try {
     if (!$SourceRoot) { $SourceRoot = $expected }
     if ([IO.Path]::GetFullPath($SourceRoot) -ne $expected -or (Get-Item -LiteralPath $SourceRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Patch target must be the task-owned pinned producer source' }
     # Git apply can silently skip absolute patch targets when launched from a
-    # nested caller directory. Keep its prefix at this checkout's root; target
-    # roots below remain fixed and every output hash is still checked.
-    # git apply also works outside a repository: source archives need no .git.
-    # Absolute --directory targets remain pinned below, never caller-selected.
-    $gitOptions = @('-C', $Private, '-c', 'core.autocrlf=false')
+    # nested caller directory. Resolve the enclosing checkout root so Git has
+    # no subdirectory prefix, including archives unpacked inside another repo.
+    # Outside a repository, apply works directly without a .git directory.
+    # Absolute SDK targets remain pinned below and every output hash is checked.
+    $gitDirectory = & git -C $PSScriptRoot rev-parse --show-toplevel 2>$null
+    if ($LASTEXITCODE -ne 0) { $gitDirectory = $Private }
+    $gitOptions = @('-C', $gitDirectory, '-c', 'core.autocrlf=false')
     function Get-SourceHash([string]$Path) {
         # A manifest's null base hash denotes a new task-owned SDK source file.
         if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
