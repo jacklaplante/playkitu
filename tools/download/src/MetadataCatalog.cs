@@ -77,6 +77,7 @@ internal sealed class SelectedObjectsStore(IReadStore inner, IReadOnlyList<Objec
     public Task<Stream> ObjectAsync(string key, CancellationToken ct) => local is null ? inner.ObjectAsync(key, ct)
         : Task.FromResult<Stream>(File.OpenRead(local.TryGetValue(key, out var path) ? path : throw new RetrievalError("window_object_unavailable")));
     public Task<string> StreamArnAsync(int slot, CancellationToken ct) => inner.StreamArnAsync(slot, ct);
+    public Task<string> SessionStreamArnAsync(SessionState session, CancellationToken ct) => inner.SessionStreamArnAsync(session, ct);
     public Task<IReadOnlyList<FragmentEntry>> FragmentsAsync(string arn, DateTimeOffset start, DateTimeOffset end, int limit, CancellationToken ct) => inner.FragmentsAsync(arn, start, end, limit, ct);
     public Task<Stream> MediaAsync(string arn, IReadOnlyList<string> fragments, CancellationToken ct) => inner.MediaAsync(arn, fragments, ct);
 }

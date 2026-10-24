@@ -38,6 +38,15 @@
           "AWSSDK.Core": "[4.0.102.11, 5.0.0)"
         }
       },
+      "AWSSDK.KinesisVideo": {
+        "type": "Direct",
+        "requested": "[4.0.100.19, 4.0.100.19]",
+        "resolved": "4.0.100.19",
+        "contentHash": "2fQWn3qnMs3lfox4YEQOK81LGM9A7mvQjqmdagvcbbORL5l4nn3/s1epWgnZUM+GGQGznixvEpZm3GvJnom6oA==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.102.11, 5.0.0)"
+        }
+      },
       "AWSSDK.S3": {
         "type": "Direct",
         "requested": "[4.0.104.4, )",

@@ -19,10 +19,21 @@ public sealed class FixtureStore : IReadStore
     public List<FragmentEntry> Fragments = [new("frag1", TimingEvidence.Unix(First), 1000, 32)];
     public byte[] Media = [1, 2, 3, 4];
     public int SessionReads, ObjectReads, MediaReads;
+    public List<SessionState> SessionRows = [];
+    public List<int> SessionPageLimits = [];
     public bool BlockMedia;
     public List<IReadOnlyList<string>> RequestedFragments = [];
     public List<ObjectEntry>? EntriesOverride;
-    public async Task<SessionState?> SessionAsync(Guid id, CancellationToken ct) { SessionReads++; await Task.CompletedTask; return id == State.SessionId ? State : null; }
+    public async Task<SessionState?> SessionAsync(Guid id, CancellationToken ct) { SessionReads++; await Task.CompletedTask; return SessionRows.Count > 0 ? SessionRows.SingleOrDefault(s => s.SessionId == id) : id == State.SessionId ? State : null; }
+    public Task<SessionPage> SessionsPageAsync(DateOnly day, int limit, string? continuation, CancellationToken ct)
+    {
+        SessionPageLimits.Add(limit);
+        if (SessionRows.Count == 0) return Task.FromResult(new SessionPage([State.SessionId], null));
+        var rows = SessionRows.Where(s => DateOnly.FromDateTime(s.AdmittedAt!.Value.UtcDateTime) == day).OrderByDescending(s => s.AdmittedAt).ToArray();
+        var start = continuation is null ? 0 : int.Parse(continuation);
+        var page = rows.Skip(start).Take(limit).Select(s => s.SessionId).ToArray();
+        return Task.FromResult(new SessionPage(page, start + page.Length < rows.Length ? (start + page.Length).ToString() : null));
+    }
     public Task<IReadOnlyList<Guid>> ListSessionsAsync(DateOnly day, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([State.SessionId]);
     public Task<IReadOnlyList<ObjectEntry>> ObjectsAsync(string prefix, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<ObjectEntry>>(EntriesOverride ?? Payloads.Select(p => new ObjectEntry(p.Key, p.Value.Length)).ToList());
     public Task<ObjectPage> ObjectsPageAsync(string prefix, int limit, string? continuation, CancellationToken ct)
@@ -35,6 +46,7 @@ public sealed class FixtureStore : IReadStore
     public Task<StoredObject?> ReceiptAsync(Guid id, string kind, int sequence, CancellationToken ct) => Task.FromResult(Receipts.GetValueOrDefault($"{kind}:{sequence}"));
     public Task<Stream> ObjectAsync(string key, CancellationToken ct) { ObjectReads++; return Task.FromResult<Stream>(new MemoryStream(Payloads[key], false)); }
     public Task<string> StreamArnAsync(int slot, CancellationToken ct) => Task.FromResult($"arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-{slot + 1:D2}/1234");
+    public Task<string> SessionStreamArnAsync(SessionState session, CancellationToken ct) => session.OnDemand ? Task.FromResult(session.StreamArn!) : StreamArnAsync(session.Slot, ct);
     public Task<IReadOnlyList<FragmentEntry>> FragmentsAsync(string arn, DateTimeOffset start, DateTimeOffset end, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<FragmentEntry>>(Fragments);
     public async Task<Stream> MediaAsync(string arn, IReadOnlyList<string> fragments, CancellationToken ct)
     {

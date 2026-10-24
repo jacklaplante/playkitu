@@ -21,16 +21,16 @@ resource "aws_apigatewayv2_stage" "issuer" {
     }
   }
   default_route_settings {
-    throttling_rate_limit    = 3
-    throttling_burst_limit   = 6
+    throttling_rate_limit    = local.c.api_rate
+    throttling_burst_limit   = local.c.api_burst
     detailed_metrics_enabled = false
   }
   dynamic "route_settings" {
     for_each = var.runtime_ready ? [1] : []
     content {
       route_key                = "POST /v1/sessions"
-      throttling_rate_limit    = 0.2
-      throttling_burst_limit   = 2
+      throttling_rate_limit    = local.c.stream_mode == "onDemand" ? local.c.recording_limits.admissionAttemptsPerMinute / 60 : 0.2
+      throttling_burst_limit   = local.c.stream_mode == "onDemand" ? min(local.c.recording_limits.admissionAttemptsPerMinute, local.c.api_burst) : 2
       detailed_metrics_enabled = false
     }
   }
@@ -91,15 +91,15 @@ resource "aws_sns_topic_policy" "alerts" {
 
 resource "aws_cloudwatch_event_rule" "cleanup" {
   name                = local.c.schedule
-  description         = "Reclaim expired issuer control references through the existing config path; no credentials or admissions."
-  schedule_expression = "rate(1 day)"
+  description         = "Reconcile expired recording leases and retained on-demand streams; no capture or admissions."
+  schedule_expression = local.c.stream_mode == "onDemand" ? "rate(1 minute)" : "rate(1 day)"
   state               = var.runtime_ready ? "ENABLED" : "DISABLED"
 }
 resource "aws_cloudwatch_event_target" "cleanup" {
   count = var.runtime_ready ? 1 : 0
   rule  = aws_cloudwatch_event_rule.cleanup.name
   arn   = local.function_arn
-  input = jsonencode({ version = "2.0", rawPath = "/v1/config", requestContext = { http = { method = "GET" } } })
+  input = local.c.stream_mode == "onDemand" ? jsonencode({ version = "playkitu.cleanup.v1" }) : jsonencode({ version = "2.0", rawPath = "/v1/config", requestContext = { http = { method = "GET" } } })
   retry_policy {
     maximum_event_age_in_seconds = 3600
     maximum_retry_attempts       = 2

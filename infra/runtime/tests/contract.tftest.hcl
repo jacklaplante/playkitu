@@ -25,6 +25,20 @@ run "runtime_limits_and_protocol" {
   }
 
 }
+run "on_demand_uses_configurable_limits_without_two_lambda_ceiling" {
+  command = plan
+  variables {
+    configuration_file = "../deployment.on-demand.example.json"
+    stream_arns        = []
+  }
+  assert {
+    condition = (aws_lambda_function.issuer.reserved_concurrent_executions == -1 &&
+      jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT).streamMode == "onDemand" &&
+      jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT).recordingLimits.concurrentSessions == null &&
+    length(jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT).streamArns) == 0)
+    error_message = "On-demand must carry explicit mode/limits and must not retain the old pool or two-execution ceiling."
+  }
+}
 run "reject_other_media_role" {
   command = plan
   variables { media_role_arn = "arn:aws:iam::123456789012:role/Administrator" }

@@ -12,10 +12,11 @@ $c = Read-InfrastructureConfiguration $ConfigurationFile
 $taskOut = [IO.Path]::GetFullPath($OutputDirectory, $PWD.ProviderPath)
 New-Item -ItemType Directory -Force $taskOut | Out-Null
 # Canonical state comes from the backend model, not a second hand-maintained seed.
-$seedText=& pwsh -NoProfile -File (Join-Path $taskRoot '../backend/issuer/seed.ps1') -VideoStreams $c.video_stream_count
+$seedCount=if($c.stream_mode-ceq'onDemand'){0}else{$c.video_stream_count}
+$seedText=& pwsh -NoProfile -File (Join-Path $taskRoot '../backend/issuer/seed.ps1') -VideoStreams $seedCount -StreamMode $c.stream_mode
 if($LASTEXITCODE){throw 'Canonical seed command failed.'}
 $taskSeed=($seedText -join '') | ConvertFrom-Json -AsHashtable -DateKind String
-if ($taskSeed.pk.S -ne 'CONTROL' -or $taskSeed.sk.S -ne 'META' -or $taskSeed.v.N -ne '1' -or $taskSeed.admissionsEnabled.BOOL -or $taskSeed.uploadsEnabled.BOOL -or ($taskSeed.data.S | ConvertFrom-Json).slots.Count -ne $c.video_stream_count) { throw 'Issuer seed changed; review required.' }
+if ($taskSeed.pk.S -ne 'CONTROL' -or $taskSeed.sk.S -ne 'META' -or $taskSeed.v.N -ne '1' -or $taskSeed.admissionsEnabled.BOOL -or $taskSeed.uploadsEnabled.BOOL -or ($taskSeed.data.S | ConvertFrom-Json).slots.Count -ne $seedCount -or ($taskSeed.data.S|ConvertFrom-Json).schemaVersion -ne $(if($c.stream_mode-ceq'onDemand'){2}else{1})) { throw 'Issuer seed changed; review required.' }
 @{TableName=$c.table;Item=$taskSeed;ConditionExpression='attribute_not_exists(#pk)';ExpressionAttributeNames=@{'#pk'='pk'}} | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $taskOut 'control-seed.json')
 @{TableName=$c.table;Key=@{pk=@{S='CONTROL'};sk=@{S='META'}};UpdateExpression='SET #ae = :ae, #ue = :ue';ConditionExpression='attribute_exists(#pk) AND attribute_exists(#sk)';ExpressionAttributeNames=@{'#pk'='pk';'#sk'='sk';'#ae'='admissionsEnabled';'#ue'='uploadsEnabled'};ExpressionAttributeValues=@{':ae'=@{BOOL=$AdmissionsEnabled};':ue'=@{BOOL=$UploadsEnabled}};ReturnValues='NONE'} | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $taskOut 'control-switch.json')
 # Strong readback exposes only the two switches, never CONTROL data/leases.

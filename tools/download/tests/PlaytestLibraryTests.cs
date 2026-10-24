@@ -36,6 +36,41 @@ public sealed class PlaytestLibraryTests
         Assert.That(windows[1].Contains(605000), Is.True);
         Assert.That(windows.All(w => w.To100ns - w.From100ns <= 600UL * 10000000), Is.True);
     }
+    [Test] public async Task PaginationReturnsAllOneHundredFortyTwoSessionsAcrossDatesWithoutTruncation()
+    {
+        var store = new FixtureStore();
+        for (var n = 0; n < 142; n++) store.SessionRows.Add(new() { SessionId = Guid.NewGuid(), AdmissionId = Guid.NewGuid().ToString("N"), Generation = 1,
+            AdmittedAt = DateTimeOffset.Parse(n < 135 ? "2026-10-16T00:00:00Z" : "2026-10-15T00:00:00Z").AddMinutes(n), Status = "active", OnDemand = true,
+            StreamArn = "owned-stream", Slot = -1 });
+        var library = new PlaytestLibrary(store, new FixtureProbe(), new Converter());
+        var all = new List<PlaytestSummary>(); string? cursor = null;
+        do {
+            var page = await library.ListAsync(new(2026, 10, 15), new(2026, 10, 16), default, cursor);
+            Assert.That(page.Sessions.Count, Is.LessThanOrEqualTo(50));
+            Assert.That(page.MayBeTruncated, Is.False); all.AddRange(page.Sessions); cursor = page.NextCursor;
+        } while (cursor is not null);
+        Assert.That(all.Select(s => s.SessionId).Distinct().Count(), Is.EqualTo(142));
+        Assert.That(all.Select(s => s.StartedUtc), Is.Ordered.Descending);
+        Assert.That(all.All(s => s.HasVideoSlot), Is.True);
+        Assert.That(store.SessionPageLimits.All(n => n is >= 1 and <= 50), Is.True);
+    }
+    [Test] public async Task PageCursorCannotBeReusedForAnotherDateRange()
+    {
+        var store = new FixtureStore();
+        for (var n = 0; n < 51; n++) store.SessionRows.Add(new() { SessionId = Guid.NewGuid(), AdmissionId = Guid.NewGuid().ToString("N"), Generation = 1,
+            AdmittedAt = DateTimeOffset.Parse("2026-10-16T00:00:00Z").AddMinutes(n) });
+        var library = new PlaytestLibrary(store, new FixtureProbe(), new Converter());
+        var page = await library.ListAsync(new(2026, 10, 15), new(2026, 10, 16), default);
+        await Assert.ThrowsAsync<RetrievalError>(() => library.ListAsync(new(2026, 10, 14), new(2026, 10, 16), default, page.NextCursor));
+    }
+    [Test] public async Task DedicatedSessionDownloadsMediaWithoutAnyPoolSlot()
+    {
+        var store = new FixtureStore(); store.State.OnDemand = true; store.State.Slot = -1;
+        store.State.StreamArn = "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-session-" + store.State.AdmissionId + "/1234";
+        store.Ready();
+        var result = await new PlaytestLibrary(store, new FixtureProbe(), new Converter()).DownloadAsync(FixtureStore.Id, Path.Combine(root, "dedicated"), _ => { }, default);
+        Assert.That(result.Status, Is.EqualTo("downloaded")); Assert.That(result.Parts, Has.Count.EqualTo(1)); Assert.That(store.MediaReads, Is.EqualTo(1));
+    }
     [TestCase(true)] [TestCase(false)]
     public async Task DownloadReusesActualReceiptAndClaimAttributionAndRetainsOriginalWhenPreviewFails(bool converted)
     {

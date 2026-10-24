@@ -9,6 +9,7 @@ public sealed class RetrievalError(string code) : Exception(code)
 
 public sealed record ObjectEntry(string Key, long Bytes);
 public sealed record ObjectPage(IReadOnlyList<ObjectEntry> Entries, string? NextToken);
+public sealed record SessionPage(IReadOnlyList<Guid> Sessions, string? NextToken);
 public sealed record FragmentEntry(string Id, DateTimeOffset ProducerUtc, long DurationMs, long Bytes);
 public sealed record ProducerRange(Guid RunId, ulong Epoch, ulong First100ns, ulong Last100ns);
 public sealed record FragmentClaim(Guid RunId, ulong Epoch, ulong Upload, string Id, ulong? TimecodeMs, ulong AckType, ulong Result)
@@ -24,6 +25,11 @@ public sealed record FragmentClaim(Guid RunId, ulong Epoch, ulong Upload, string
 public interface IReadStore
 {
     Task<IReadOnlyList<Guid>> ListSessionsAsync(DateOnly day, int limit, CancellationToken ct);
+    async Task<SessionPage> SessionsPageAsync(DateOnly day, int limit, string? continuation, CancellationToken ct)
+    {
+        if (continuation is not null) throw new RetrievalError("session_paging_unavailable");
+        return new(await ListSessionsAsync(day, limit, ct), null);
+    }
     Task<SessionState?> SessionAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<ObjectEntry>> ObjectsAsync(string prefix, int limit, CancellationToken ct);
     Task<ObjectPage> ObjectsPageAsync(string prefix, int limit, string? continuation, CancellationToken ct) =>
@@ -31,6 +37,7 @@ public interface IReadStore
     Task<StoredObject?> ReceiptAsync(Guid id, string kind, int sequence, CancellationToken ct);
     Task<Stream> ObjectAsync(string key, CancellationToken ct);
     Task<string> StreamArnAsync(int slot, CancellationToken ct);
+    Task<string> SessionStreamArnAsync(SessionState session, CancellationToken ct) => StreamArnAsync(session.Slot, ct);
     Task<IReadOnlyList<FragmentEntry>> FragmentsAsync(string arn, DateTimeOffset start, DateTimeOffset end, int limit, CancellationToken ct);
     Task<Stream> MediaAsync(string arn, IReadOnlyList<string> fragments, CancellationToken ct);
 }

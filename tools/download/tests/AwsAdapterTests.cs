@@ -62,7 +62,9 @@ public sealed class AwsAdapterTests
             if (target.EndsWith(".Query", StringComparison.Ordinal))
             {
                 queries++;
-                return queries == 1 ? FakeHttpFactory.Json(new { Items = Array.Empty<object>(), LastEvaluatedKey = new { pk = new { S = "cursor" }, sk = new { S = "META" } } })
+                return queries == 1 ? FakeHttpFactory.Json(new { Items = Array.Empty<object>(), LastEvaluatedKey = new {
+                    pk = new { S = DbKey.Session(FixtureStore.Id).Pk }, sk = new { S = "META" },
+                    sessionDay = new { S = "2026-10-15" }, sessionOrder = new { S = "2026-10-15T00:00:00.0000000+00:00#" + FixtureStore.Id.ToString("N") } } })
                     : FakeHttpFactory.Json(new { Items = new[] { new { pk = new { S = DbKey.Session(FixtureStore.Id).Pk }, sk = new { S = "META" } } } });
             }
             var isObject = body.RootElement.GetProperty("Key").GetProperty("sk").GetProperty("S").GetString()!.StartsWith("OBJECT#", StringComparison.Ordinal);
@@ -80,7 +82,7 @@ public sealed class AwsAdapterTests
         await store.ReceiptAsync(FixtureStore.Id, "log", 12, CancellationToken.None);
         Assert.Multiple(() => {
             Assert.That(queries, Is.EqualTo(2)); Assert.That(bodies[0].GetProperty("IndexName").GetString(), Is.EqualTo("sessions-by-day"));
-            Assert.That(bodies[1].GetProperty("ExclusiveStartKey").GetProperty("pk").GetProperty("S").GetString(), Is.EqualTo("cursor"));
+            Assert.That(bodies[1].GetProperty("ExclusiveStartKey").GetProperty("pk").GetProperty("S").GetString(), Is.EqualTo(DbKey.Session(FixtureStore.Id).Pk));
             Assert.That(bodies[2].GetProperty("ConsistentRead").GetBoolean(), Is.True);
             Assert.That(bodies[3].GetProperty("Key").GetProperty("sk").GetProperty("S").GetString(), Is.EqualTo("OBJECT#log#000012"));
         });
@@ -105,6 +107,41 @@ public sealed class AwsAdapterTests
         await using var stream = await store.ObjectAsync(items.Single().Key, CancellationToken.None); using var output = new MemoryStream(); await stream.CopyToAsync(output);
         Assert.That(output.ToArray(), Is.EqualTo(new byte[] { 1, 2, 3 })); Assert.That(calls, Is.EqualTo(2));
     }
+    [Test] public async Task SessionPaginationUsesActualSdkContinuationAndRejectsAnotherDay()
+    {
+        var bodies = new List<JsonElement>(); var id = FixtureStore.Id;
+        var key = new Dictionary<string, object> { ["pk"] = new { S = "SESSION#" + id.ToString("N") }, ["sk"] = new { S = "META" },
+            ["sessionDay"] = new { S = "2026-10-15" }, ["sessionOrder"] = new { S = "2026-10-15T12:00:00.0000000+00:00#" + id.ToString("N") } };
+        var http = new FakeHttpFactory(async request => {
+            var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync()).RootElement.Clone(); bodies.Add(body);
+            return body.TryGetProperty("ExclusiveStartKey", out _) ? FakeHttpFactory.Json(new { Items = Array.Empty<object>() })
+                : FakeHttpFactory.Json(new { Items = new[] { key }, LastEvaluatedKey = key });
+        });
+        using var d = new AmazonDynamoDBClient(Fake, new AmazonDynamoDBConfig { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
+        using var s = new AmazonS3Client(Fake, RegionEndpoint.USEast2); using var v = new AmazonKinesisVideoClient(Fake, RegionEndpoint.USEast2);
+        var store = new AwsReadStore(d, s, v, _ => throw new AssertionException("unexpected archive"), Playkitu.Tests.DeploymentFixture.Create());
+        var page = await store.SessionsPageAsync(new(2026, 10, 15), 50, null, default);
+        Assert.That(page.Sessions, Is.EqualTo(new[] { id })); Assert.That(page.NextToken, Is.Not.Null);
+        Assert.That((await store.SessionsPageAsync(new(2026, 10, 15), 50, page.NextToken, default)).NextToken, Is.Null);
+        Assert.That(bodies[1].GetProperty("ExclusiveStartKey").GetProperty("pk").GetProperty("S").GetString(), Is.EqualTo("SESSION#" + id.ToString("N")));
+        await Assert.ThrowsAsync<RetrievalError>(() => store.SessionsPageAsync(new(2026, 10, 16), 50, page.NextToken, default));
+        Assert.That(bodies, Has.Count.EqualTo(2));
+    }
+    [TestCase(true)][TestCase(false)] public async Task DedicatedArnMustMatchThisAdmissionBeforeAnySdkRequest(bool valid)
+    {
+        var options = Playkitu.Tests.DeploymentFixture.Create(streamMode: "onDemand");
+        var state = new SessionState { OnDemand = true, AdmissionId = new string('a', 32) };
+        var expected = $"arn:aws:kinesisvideo:us-east-2:123456789012:stream/{options.SessionStreamName(state.AdmissionId)}/1234";
+        state.StreamArn = valid ? expected : expected.Replace(state.AdmissionId, new string('b', 32));
+        var http = new FakeHttpFactory(_ => Task.FromResult(FakeHttpFactory.Json(new { StreamInfo = new { StreamARN = expected } })));
+        using var d = new AmazonDynamoDBClient(Fake, RegionEndpoint.USEast2); using var s = new AmazonS3Client(Fake, RegionEndpoint.USEast2);
+        using var v = new AmazonKinesisVideoClient(Fake, new AmazonKinesisVideoConfig { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
+        var store = new AwsReadStore(d, s, v, _ => throw new AssertionException("unexpected archive"), options);
+        if (valid) Assert.That(await store.SessionStreamArnAsync(state, default), Is.EqualTo(expected));
+        else await Assert.ThrowsAsync<RetrievalError>(() => store.SessionStreamArnAsync(state, default));
+        Assert.That(http.Requests.Count, Is.EqualTo(valid ? 1 : 0));
+    }
+
     [Test] public async Task RealKvsMarshallerUsesProducerSelectorAndExplicitOpaqueFragmentList()
     {
         var arn = "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-01/1234";

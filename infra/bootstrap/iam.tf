@@ -17,9 +17,25 @@ resource "aws_iam_role" "project" {
 }
 
 locals {
-  stream_arns = [for k in sort(keys(aws_kinesis_video_stream.slot)) : aws_kinesis_video_stream.slot[k].arn]
-  signin      = { Effect = "Allow", Action = ["signin:AuthorizeOAuth2Access", "signin:CreateOAuth2Token"], Resource = "arn:aws:signin:${local.c.region}:${local.c.account}:oauth2/public-client/localhost" }
-  issuer_statements = [
+  stream_arns      = [for k in sort(keys(aws_kinesis_video_stream.slot)) : aws_kinesis_video_stream.slot[k].arn]
+  session_streams  = "arn:aws:kinesisvideo:${local.c.region}:${local.c.account}:stream/${local.c.stream_name_prefix}session-${join("", [for i in range(32) : "?"])}/*"
+  readable_streams = concat(local.stream_arns, local.c.stream_mode == "onDemand" ? [local.session_streams] : [])
+  on_demand_issuer_statements = [for statement in [
+    { Sid = "ControlFenceOnly", Effect = "Allow", Action = ["dynamodb:ConditionCheckItem"], Resource = local.table_arn, Condition = { "ForAllValues:StringEquals" = { "dynamodb:LeadingKeys" = ["CONTROL"] } } },
+    { Sid = "DueStreamWork", Effect = "Allow", Action = ["dynamodb:Query"], Resource = "${local.table_arn}/index/stream-work-by-due" },
+    { Sid = "ExactAdmissionMetadata", Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:ListTagsForStream"], Resource = local.session_streams },
+    { Sid = "CreateTaggedAdmissionStream", Effect = "Allow", Action = ["kinesisvideo:CreateStream"], Resource = local.session_streams, Condition = {
+      StringEquals                = { "aws:RequestTag/Project" = local.c.project, "aws:RequestTag/ManagedBy" = "playkitu" },
+      StringLike                  = { "aws:RequestTag/Admission" = join("", [for i in range(32) : "?"]) },
+      "ForAllValues:StringEquals" = { "aws:TagKeys" = ["Project", "ManagedBy", "Admission"] }
+    } },
+    { Sid = "RetireOwnedAdmissionStream", Effect = "Allow", Action = ["kinesisvideo:DeleteStream"], Resource = local.session_streams, Condition = {
+      StringEquals = { "aws:ResourceTag/Project" = local.c.project, "aws:ResourceTag/ManagedBy" = "playkitu" },
+      StringLike   = { "aws:ResourceTag/Admission" = join("", [for i in range(32) : "?"]) }
+    } }
+  ] : statement if local.c.stream_mode == "onDemand"]
+  signin = { Effect = "Allow", Action = ["signin:AuthorizeOAuth2Access", "signin:CreateOAuth2Token"], Resource = "arn:aws:signin:${local.c.region}:${local.c.account}:oauth2/public-client/localhost" }
+  issuer_statements = concat([
     { Sid = "StrongReads", Effect = "Allow", Action = ["dynamodb:GetItem"], Resource = local.table_arn },
     # TransactWriteItems is an API, not an IAM action. Do not grant ordinary PutItem.
     { Sid = "AtomicPutsOnly", Effect = "Allow", Action = ["dynamodb:PutItem"], Resource = local.table_arn, Condition = { "ForAnyValue:StringEquals" = { "dynamodb:EnclosingOperation" = ["TransactWriteItems"] } } },
@@ -27,8 +43,8 @@ locals {
     { Effect = "Allow", Action = ["sts:AssumeRole"], Resource = local.roles.media },
     { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${aws_s3_bucket.recording.arn}/sessions/*" },
     { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "${local.log_arn}:log-stream:*" }
-  ]
-  media_statements = [{ Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:GetDataEndpoint", "kinesisvideo:PutMedia"], Resource = local.stream_arns }]
+  ], local.on_demand_issuer_statements)
+  media_statements = [{ Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:GetDataEndpoint", "kinesisvideo:PutMedia"], Resource = local.readable_streams }]
   deploy_statements = [
     local.signin,
     { Sid = "FunctionOnly", Effect = "Allow", Action = ["lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:GetFunctionCodeSigningConfig", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:PutFunctionConcurrency", "lambda:GetFunctionConcurrency", "lambda:ListTags", "lambda:TagResource", "lambda:UntagResource", "lambda:ListVersionsByFunction", "lambda:GetRuntimeManagementConfig"], Resource = local.function_arn },
@@ -46,7 +62,7 @@ locals {
     { Effect = "Allow", Action = ["dynamodb:Query"], Resource = "${local.table_arn}/index/sessions-by-day" },
     { Effect = "Allow", Action = ["s3:ListBucket"], Resource = aws_s3_bucket.recording.arn, Condition = { StringLike = { "s3:prefix" = ["sessions/*"] } } },
     { Effect = "Allow", Action = ["s3:GetObject"], Resource = "${aws_s3_bucket.recording.arn}/sessions/*" },
-    { Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:GetDataEndpoint", "kinesisvideo:ListFragments", "kinesisvideo:GetMediaForFragmentList", "kinesisvideo:GetClip"], Resource = local.stream_arns }
+    { Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:GetDataEndpoint", "kinesisvideo:ListFragments", "kinesisvideo:GetMediaForFragmentList", "kinesisvideo:GetClip"], Resource = local.readable_streams }
   ]
   operations_statements = [
     local.signin,

@@ -6,7 +6,7 @@ namespace Playkitu.Retrieval;
 
 public sealed record PlaytestSummary(Guid SessionId, DateTimeOffset StartedUtc, string Status,
     string GameVersion, bool HasVideoSlot, bool MicrophoneConsented);
-public sealed record LibraryListing(IReadOnlyList<PlaytestSummary> Sessions, bool MayBeTruncated);
+public sealed record LibraryListing(IReadOnlyList<PlaytestSummary> Sessions, bool MayBeTruncated, string? NextCursor = null);
 public sealed record PlaybackPart(string Original, string? Preview);
 public sealed class PlaytestDownload
 {
@@ -21,6 +21,7 @@ public interface IPlaybackConverter { Task<bool> ConvertAsync(string input, stri
 // it never guesses a stream's time interval or downloads a neighbouring tester.
 public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlaybackConverter converter)
 {
+    private sealed record Cursor(DateOnly From, DateOnly To, DateOnly Day, string? Page);
     public static string PlaybackFile(string directory, string relative)
     {
         var match = Regex.Match(relative.Replace('\\', '/'), @"\A(section-[0-9]{2})/(media-[0-9]{4}\.(?:mkv|mp4))\z");
@@ -30,21 +31,36 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
         if ((File.GetAttributes(section) & FileAttributes.ReparsePoint) != 0) throw new RetrievalError("invalid_playback_reference");
         return RetrievalService.LocalFile(section, match.Groups[2].Value);
     }
-    public async Task<LibraryListing> ListAsync(DateOnly from, DateOnly to, CancellationToken ct)
+    public async Task<LibraryListing> ListAsync(DateOnly from, DateOnly to, CancellationToken ct, string? continuation = null)
     {
         if (to < from || to.DayNumber - from.DayNumber > 30) throw new RetrievalError("date_range_maximum_31_days");
-        var sessions = new Dictionary<Guid, PlaytestSummary>(); var truncated = false;
-        for (var day = to; day >= from; day = day.AddDays(-1)) {
-            var ids = await store.ListSessionsAsync(day, 50, ct); truncated |= ids.Count == 50;
-            foreach (var id in ids) {
+        var cursor = new Cursor(from, to, to, null);
+        if (continuation is not null) {
+            try {
+                if (continuation.Length > 8192) throw new FormatException();
+                cursor = JsonSerializer.Deserialize<Cursor>(Convert.FromBase64String(continuation), Wire.Json)!;
+                if (cursor.From != from || cursor.To != to || cursor.Day < from || cursor.Day > to || cursor.Page?.Length > 4096) throw new FormatException();
+            } catch { throw new RetrievalError("invalid_session_cursor"); }
+        }
+        var sessions = new Dictionary<Guid, PlaytestSummary>(); var seen = new HashSet<string>();
+        for (var requests = 0; requests < 64 && cursor.Day >= from; requests++) {
+            var marker = cursor.Day.ToString("O") + ":" + cursor.Page;
+            if (!seen.Add(marker)) throw new RetrievalError("repeated_page");
+            var page = await store.SessionsPageAsync(cursor.Day, 50 - sessions.Count, cursor.Page, ct);
+            if (page.Sessions.Count > 50 - sessions.Count) throw new RetrievalError("invalid_session_page");
+            foreach (var id in page.Sessions) {
                 var s = await store.SessionAsync(id, ct); if (s is null || s.AdmittedAt is null) continue;
                 RetrievalService.ValidateSession(id, s);
                 // Ignore stale/mismatched day-index entries; Dynamo TTL/GSI updates lag.
-                if (DateOnly.FromDateTime(s.AdmittedAt.Value.UtcDateTime) != day) continue;
-                sessions[id] = new(id, s.AdmittedAt.Value, s.Status, s.Build.GameVersion, s.Slot >= 0, s.Consent.Microphone);
+                if (DateOnly.FromDateTime(s.AdmittedAt.Value.UtcDateTime) != cursor.Day) continue;
+                sessions[id] = new(id, s.AdmittedAt.Value, s.Status, s.Build.GameVersion, s.OnDemand ? s.StreamArn is not null : s.Slot >= 0, s.Consent.Microphone);
             }
+            if (page.NextToken is null && cursor.Day == from) return new(sessions.Values.OrderByDescending(s => s.StartedUtc).ToArray(), false);
+            cursor = page.NextToken is not null ? cursor with { Page = page.NextToken } : cursor with { Day = cursor.Day.AddDays(-1), Page = null };
+            if (sessions.Count == 50) break;
         }
-        return new(sessions.Values.OrderByDescending(s => s.StartedUtc).ToArray(), truncated);
+        var next = cursor.Day >= from ? Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(cursor, Wire.Json)) : null;
+        return new(sessions.Values.OrderByDescending(s => s.StartedUtc).ToArray(), false, next);
     }
 
     public static ProducerWindow[] Windows(IEnumerable<ClaimDigest> claims)

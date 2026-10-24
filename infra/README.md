@@ -4,23 +4,29 @@ Source-only deployment workflow for one explicitly selected AWS account/region a
 Steam app. No existing deployment, API, secret, verified email subscription or
 live cost result is included. Preparation and tests do not deploy or activate AWS.
 
-## Fixed architecture and limits
+## Architecture and configurable limits
 
 Three staged roots keep privileged owner bootstrap separate from routine deployment:
 
 1. `foundation`: an empty named HTTP API; optionally its AWS-managed service-linked
    role only when the owner confirms it is absent. Do not import/manage an existing
    shared role.
-2. `bootstrap`: a configured pool of retained KVS streams (four by default), private encrypted S3 state/diagnostics,
+2. `bootstrap`: private encrypted S3 state/diagnostics,
    DynamoDB, secret metadata, roles under a console-owned permissions boundary,
-   closed API stage, alerts and disabled cleanup. Routine deploy cannot edit IAM,
+   closed API stage, alerts and initially disabled cleanup. On-demand mode adds
+   the stream-work index and narrowly scoped stream lifecycle permissions;
+   pooled compatibility retains its configured Terraform-owned streams.
+   Routine deploy cannot edit IAM,
    read publisher secrets or grant invocation permissions.
 3. `runtime`: the reviewed Linux x64 Lambda ZIP and four API route integrations.
    A second owner bootstrap checkpoint grants narrowly bound invocation/cleanup
    only after OFF/OFF CONTROL and access logging are verified.
 
-There are no always-on servers, NAT/VPC, runtime-created streams, automatic video
-exports or permission-expanding deployment roles. Media credentials are write-only
+There are no always-on servers, NAT/VPC, automatic video exports or
+permission-expanding deployment roles. In on-demand mode the issuer creates a
+tagged stream for each admission and the private minute worker retires it after
+retention. Only that service role can manage the session-stream namespace.
+Media credentials are write-only
 for one assigned stream, short-lived, with the immutable four-hour deadline.
 Diagnostic grants bind exact session/key, size/checksum and AES256 conditions.
 
@@ -28,10 +34,15 @@ Video/diagnostics retain 30 days. State is versioned/protected; diagnostic versi
 are suspended with current/noncurrent expiry and incomplete multipart cleanup.
 DynamoDB TTL is eventual cleanup, not lease authority. Resource deletion protection
 and `prevent_destroy` remain enabled; removal is a separate owner-reviewed action.
-Quotas are eight admissions/tester/day, eight globally/day and fifty/month, no
-refunds; finite session/object/request limits still apply. Set `videoStreamCount`
-to configure 1–8 streams; [capacity and safe resizing](../docs/capacity.md) explains
-the separate quotas, quarantine and migration of an existing pool.
+For new installations start with `deployment.on-demand.example.json`. Its
+`recordingLimits` exposes concurrent, global daily/monthly and tester daily caps:
+`null` disables an application count cap. Request rates and Lambda concurrency
+are also configurable. Finite session/object/request limits and AWS account
+quotas still apply. The compatibility example omits `streamMode` and keeps the
+old pooled defaults (four streams, eight admissions/day and fifty/month).
+Read [capacity and migration](../docs/capacity.md) before changing a live
+installation. Preserve old Terraform-owned streams for old recordings;
+`videoStreamCount: 0` is for a fresh installation, not a deletion migration.
 
 Monthly budget alerts use a USD100 budget with actual USD10/25/50 and forecast
 USD75 notifications. Alerts and tag accounting can be delayed/incomplete; neither
@@ -62,7 +73,9 @@ principal/federation role. Never use root CLI keys or AdministratorAccess. No us
 or pipeline may let routine deploy expand its own permissions. Read
 [readiness and controls](READINESS.md) before activation.
 
-1. Copy `deployment.example.json` to ignored `private/deployment.json`; replace the
+1. Copy `deployment.on-demand.example.json` to ignored `private/deployment.json`
+   for a new on-demand installation (`deployment.example.json` retains pooled
+   compatibility); replace the
    fake account/app/region/email with the owner's selected values. Keep identities
    consistent with the client. Use an absolute path in all roots. The configuration
    accepts only its documented nonsecret fields; resource names are derived.
@@ -114,7 +127,8 @@ request. Never overwrite CONTROL, reclaim by direct table editing, or reset quot
    account-level delivery prerequisites. Log format contains only request ID,
    route key, status and latency, never headers/bodies/tickets. Then review a second
    bootstrap plan with `runtime_ready=true` and `owner_logging_ready=true`. This
-   enables bound invocation/once-daily cleanup, while CONTROL remains OFF/OFF.
+   enables bound invocation/cleanup (every minute on demand, daily in pooled
+   compatibility), while CONTROL remains OFF/OFF.
 8. Save/review `terraform -chdir=infra/runtime output -json download_configuration`
    as an ignored owner download JSON, and configure the client from the same trust
    values. Confirm email subscription/alerts and cost-allocation tag coverage.

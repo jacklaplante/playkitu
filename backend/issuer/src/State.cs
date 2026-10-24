@@ -2,6 +2,7 @@ namespace Playkitu.Issuer;
 
 public sealed class GlobalState
 {
+    public int SchemaVersion { get; set; } = 1;
     public Dictionary<Guid, PendingReference> Pending { get; set; } = [];
     public Dictionary<Guid, ActiveReference> Active { get; set; } = [];
     public StreamSlot[] Slots { get; set; } = Enumerable.Range(0, Deployment.DefaultVideoStreams).Select(_ => new StreamSlot()).ToArray();
@@ -61,6 +62,12 @@ public sealed class StreamSlot
 }
 public sealed class SessionState
 {
+    public bool OnDemand { get; set; }
+    public string TesterHash { get; set; } = "";
+    public DateTimeOffset LastSeen { get; set; }
+    public long RequestWindow { get; set; }
+    public int Requests { get; set; }
+    public string? StreamArn { get; set; }
     public Guid SessionId { get; set; }
     public string AdmissionId { get; set; } = "";
     public string Status { get; set; } = "pending";
@@ -91,6 +98,29 @@ public sealed class SessionState
     public int Slot { get; set; } = -1;
     public string SlotGeneration { get; set; } = "";
     public string Prefix => $"sessions/{AdmittedAt:yyyy-MM-dd}/{SessionId:N}/";
+}
+public sealed class TesterLease
+{
+    public Guid SessionId { get; set; }
+    public string AdmissionId { get; set; } = "";
+    public DateTimeOffset Until { get; set; }
+}
+public sealed class UsageCounter { public long Count { get; set; } }
+// This ledger has no TTL while a stream may exist. It survives missing session
+// rows, uncertain Create/Delete results and failed starts. Due records are indexed
+// by a fixed shard, with an explicit timestamp rather than relying on TTL timing.
+public sealed class StreamWork
+{
+    public Guid SessionId { get; set; }
+    public string AdmissionId { get; set; } = "";
+    public string TesterHash { get; set; } = "";
+    public string? StreamArn { get; set; }
+    public DateTimeOffset Due { get; set; }
+    public DateTimeOffset RetireAfter { get; set; }
+    public bool CapacityHeld { get; set; }
+    public bool Closed { get; set; }
+    public bool Deleted { get; set; }
+    public static DbKey Key(string admission) => new("STREAM#" + admission);
 }
 public sealed record DbKey(string Pk, string Sk = "META")
 {

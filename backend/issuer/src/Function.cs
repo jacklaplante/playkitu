@@ -5,6 +5,7 @@ using Amazon.Lambda.Core;
 using Amazon.S3;
 using Amazon.SecretsManager;
 using Amazon.SecurityToken;
+using Amazon.KinesisVideo;
 using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
@@ -24,9 +25,20 @@ public sealed class Function
         var elapsed = Stopwatch.StartNew();
         using var deadline = new CancellationTokenSource();
         var budget = context is null ? TimeSpan.FromSeconds(8) : context.RemainingTime - TimeSpan.FromMilliseconds(250);
-        if (budget <= TimeSpan.Zero) return Reply(503, new { code = "issuer_timeout" }, 2);
-        budget = budget < TimeSpan.FromSeconds(8) ? budget : TimeSpan.FromSeconds(8);
+        if (budget <= TimeSpan.Zero) {
+            if (request.Version == "playkitu.cleanup.v1") throw new InvalidOperationException("Scheduled recording cleanup did not complete.");
+            return Reply(503, new { code = "issuer_timeout" }, 2);
+        }
+        var ceiling = TimeSpan.FromSeconds(request.Version == "playkitu.cleanup.v1" ? 55 : 8);
+        budget = budget < ceiling ? budget : ceiling;
         deadline.CancelAfter(budget);
+        // A scheduled failure must be a Lambda error so the service error alarm
+        // fires. Returning an API-style 503 would count as a successful invocation.
+        // API Gateway fixes Version=2.0; a public body cannot choose this event.
+        if (request.Version == "playkitu.cleanup.v1") {
+            try { return Reply(200, await service.Value.CleanupAsync(deadline.Token), null); }
+            catch { throw new InvalidOperationException("Scheduled recording cleanup did not complete."); }
+        }
         try
         {
             Wire.Require(request.Version == "2.0" && request.RequestContext?.Http is not null, "invalid_gateway_event");
@@ -132,6 +144,8 @@ public sealed class Function
         var time = TimeProvider.System;
         var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(2), MaxConnectionsPerServer = 4 }) { Timeout = Timeout.InfiniteTimeSpan };
         return new(new(dynamo, options.Table), new ValveVerifier(http, new(secrets, options.PublisherSecretArn, time), options.SteamAppId),
-            new StsMediaIssuer(sts, options.MediaRoleArn), new S3UploadSigner(s3, options.Bucket), options, time);
+            new StsMediaIssuer(sts, options.MediaRoleArn), new S3UploadSigner(s3, options.Bucket), options, time,
+            options.OnDemand ? new SessionStreams(new AmazonKinesisVideoClient(new AmazonKinesisVideoConfig {
+                RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true }), options) : null);
     }
 }

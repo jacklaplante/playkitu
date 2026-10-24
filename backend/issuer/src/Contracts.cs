@@ -131,10 +131,11 @@ public sealed class IssuerOptions : Deployment
     public const int SessionSeconds = RecordingDiagnosticsLimits.SessionSeconds, IdleSeconds = 180, RetentionDays = 30;
     public const int MaxTesterAdmissionsPerUtcDay = 8;
     public const long MaxBytes = 64L * 1024 * 1024;
-    public static object Limits() => new { sessionSeconds = SessionSeconds, inactivitySeconds = IdleSeconds, heartbeatSeconds = 60,
+    public static object Limits(bool onDemand = false, RecordingLimits? configured = null) => new { sessionSeconds = SessionSeconds, inactivitySeconds = IdleSeconds, heartbeatSeconds = 60,
         maxBytes = RecordingDiagnosticsLimits.StoredBytesPerSession, maxObjects = RecordingDiagnosticsLimits.ObjectsPerSession,
         metadataFinalizationSeconds = RecordingDiagnosticsLimits.MetadataFinalizationSeconds,
         maxObjectsPerRequest = 16, logObjectBytes = 131072, manifestObjectBytes = 32768,
         uploadGrantSeconds = 120, mediaCredentialSeconds = 900, refreshAfterSeconds = 600, pendingReservationSeconds = 20,
-        admissionDeadlineSeconds = 90, maxAdmissionGenerations = 3, maxActiveSessions = 8, maxPendingAdmissions = 8 };
+        admissionDeadlineSeconds = 90, maxAdmissionGenerations = 3,
+        maxActiveSessions = onDemand ? configured?.ConcurrentSessions : 8, maxPendingAdmissions = onDemand ? (int?)null : 8 };
 }

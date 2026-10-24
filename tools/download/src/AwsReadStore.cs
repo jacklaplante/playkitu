@@ -30,27 +30,44 @@ public sealed class AwsReadStore(IAmazonDynamoDB dynamo, IAmazonS3 s3, IAmazonKi
 
     public async Task<IReadOnlyList<Guid>> ListSessionsAsync(DateOnly day, int limit, CancellationToken ct)
     {
-        var ids = new List<Guid>(); Dictionary<string, AttributeValue>? next = null;
-        var seen = new HashSet<string>();
-        for (var page = 0; page < 32; page++)
-        {
-            var result = await dynamo.QueryAsync(new QueryRequest { TableName = Table, IndexName = "sessions-by-day",
-                KeyConditionExpression = "sessionDay = :day", ExpressionAttributeValues = new() { [":day"] = new() { S = day.ToString("yyyy-MM-dd") } },
-                ProjectionExpression = "pk,sk", Limit = limit - ids.Count, ExclusiveStartKey = next, ScanIndexForward = false }, ct);
-            foreach (var item in result.Items ?? [])
-            {
-                if (!item.TryGetValue("pk", out var pk) || !item.TryGetValue("sk", out var sk) || sk.S != "META"
-                    || !pk.S.StartsWith("SESSION#", StringComparison.Ordinal) || !Guid.TryParseExact(pk.S[8..], "N", out var id))
-                    throw new RetrievalError("invalid_session_index");
-                if (!ids.Contains(id)) ids.Add(id);
-                if (ids.Count == limit) return ids;
-            }
-            next = result.LastEvaluatedKey;
-            if (next is null || next.Count == 0) return ids;
-            var token = System.Text.Json.JsonSerializer.Serialize(next);
-            if (!seen.Add(token)) throw new RetrievalError("repeated_page");
+        if (limit is < 1 or > 50) throw new RetrievalError("invalid_list_limit");
+        var ids = new List<Guid>(); string? next = null; var seen = new HashSet<string>();
+        for (var page = 0; page < 32; page++) {
+            var result = await SessionsPageAsync(day, limit - ids.Count, next, ct);
+            foreach (var id in result.Sessions) if (!ids.Contains(id)) ids.Add(id);
+            if (ids.Count == limit || result.NextToken is null) return ids;
+            next = result.NextToken;
+            if (!seen.Add(next)) throw new RetrievalError("repeated_page");
         }
         throw new RetrievalError("page_limit");
+    }
+    public async Task<SessionPage> SessionsPageAsync(DateOnly day, int limit, string? continuation, CancellationToken ct)
+    {
+        if (limit is < 1 or > 50 || continuation?.Length > 4096) throw new RetrievalError("invalid_session_cursor");
+        Dictionary<string, AttributeValue>? after = null;
+        if (continuation is not null) {
+            try {
+                var key = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(Convert.FromBase64String(continuation), Wire.Json)!;
+                if (key.Count != 4 || key["sessionDay"] != day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                    || key["sk"] != "META" || !key["pk"].StartsWith("SESSION#", StringComparison.Ordinal)
+                    || !Guid.TryParseExact(key["pk"][8..], "N", out var id) || !key["sessionOrder"].EndsWith("#" + id.ToString("N"), StringComparison.Ordinal)
+                    || !key["sessionOrder"].StartsWith(key["sessionDay"] + "T", StringComparison.Ordinal)) throw new FormatException();
+                after = key.ToDictionary(p => p.Key, p => new AttributeValue { S = p.Value });
+            } catch { throw new RetrievalError("invalid_session_cursor"); }
+        }
+        var response = await dynamo.QueryAsync(new QueryRequest { TableName = Table, IndexName = "sessions-by-day",
+            KeyConditionExpression = "sessionDay = :day", ExpressionAttributeValues = new() { [":day"] = new() { S = day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) } },
+            ProjectionExpression = "pk,sk,sessionDay,sessionOrder", Limit = limit, ExclusiveStartKey = after, ScanIndexForward = false }, ct);
+        var ids = new List<Guid>();
+        foreach (var item in response.Items ?? []) {
+            if (!item.TryGetValue("pk", out var pk) || !item.TryGetValue("sk", out var sk) || sk.S != "META"
+                || !pk.S.StartsWith("SESSION#", StringComparison.Ordinal) || !Guid.TryParseExact(pk.S[8..], "N", out var id)) throw new RetrievalError("invalid_session_index");
+            ids.Add(id);
+        }
+        var next = response.LastEvaluatedKey is { Count: > 0 }
+            ? Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(response.LastEvaluatedKey.ToDictionary(p => p.Key, p => p.Value.S), Wire.Json)) : null;
+        if (next is not null && next == continuation) throw new RetrievalError("repeated_page");
+        return new(ids, next);
     }
     public async Task<IReadOnlyList<ObjectEntry>> ObjectsAsync(string prefix, int limit, CancellationToken ct)
     {
@@ -85,10 +102,20 @@ public sealed class AwsReadStore(IAmazonDynamoDB dynamo, IAmazonS3 s3, IAmazonKi
         var response = await s3.GetObjectAsync(new GetObjectRequest { BucketName = Bucket, Key = key }, ct);
         return new OwnedReadStream(response.ResponseStream, response);
     }
-    public async Task<string> StreamArnAsync(int slot, CancellationToken ct)
+    public Task<string> SessionStreamArnAsync(SessionState session, CancellationToken ct)
+    {
+        if (!session.OnDemand) return StreamArnAsync(session.Slot, ct);
+        if (session.StreamArn is null || !deployment.IsSessionStream(session.StreamArn, session.AdmissionId)) throw new RetrievalError("wrong_stream");
+        return VerifyStreamAsync(session.StreamArn, ct);
+    }
+    public Task<string> StreamArnAsync(int slot, CancellationToken ct)
     {
         if (slot < 0 || slot >= deployment.StreamArns.Length) throw new RetrievalError("invalid_slot");
         var expected = deployment.StreamArns[slot];
+        return VerifyStreamAsync(expected, ct);
+    }
+    private async Task<string> VerifyStreamAsync(string expected, CancellationToken ct)
+    {
         var name = expected.Split('/')[1];
         var response = await video.DescribeStreamAsync(new() { StreamName = name }, ct);
         var arn = response.StreamInfo?.StreamARN;

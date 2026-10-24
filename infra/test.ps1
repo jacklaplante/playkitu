@@ -52,6 +52,28 @@ foreach($count in @(0,9,1.5,'4',$true)){
  if(!$rejected){throw 'Invalid video stream count accepted.'}
 }
 if((Read-InfrastructureConfiguration "$evidence/deployment-eight.json").video_stream_count -ne 8){throw 'Configured video pool mismatch.'}
+# Exercise the actual PowerShell preparation path as well as mocked Terraform.
+# An empty on-demand pool must not generate legacy slot permissions or seed maps.
+$onDemandFile=Join-Path $PSScriptRoot 'deployment.on-demand.example.json'
+$onDemand=Read-InfrastructureConfiguration $onDemandFile
+if($onDemand.stream_mode-cne'onDemand'-or$onDemand.video_stream_count-ne 0-or$null-ne$onDemand.recording_limits.concurrentSessions-or$null-ne$onDemand.lambda_concurrency){throw 'On-demand defaults changed.'}
+$onDemandOwner=Join-Path $owner 'on-demand'
+& "$PSScriptRoot/access/prepare-owner.ps1" -ConfigurationFile $onDemandFile -OperatorPrincipalArn "arn:aws:iam::$($onDemand.account):user/offline-fixture" -ApiId abc123def4 -WindowStartUtc ([DateTimeOffset]'2000-01-01Z') -WindowEndUtc ([DateTimeOffset]'2000-01-01T00:30:00Z') -ExpiredExample -OutputDirectory $onDemandOwner
+& "$PSScriptRoot/access/prepare-control.ps1" -ConfigurationFile $onDemandFile -OutputDirectory "$onDemandOwner/controls"
+$onDemandSeed=Get-Content "$onDemandOwner/controls/control-seed.json" -Raw|ConvertFrom-Json -AsHashtable
+$onDemandState=$onDemandSeed.Item.data.S|ConvertFrom-Json
+if($onDemandSeed.Item.admissionsEnabled.BOOL-or$onDemandSeed.Item.uploadsEnabled.BOOL-or$onDemandState.schemaVersion-ne 2-or$onDemandState.slots.Count-ne 0-or$onDemandSeed.ConditionExpression-ne'attribute_not_exists(#pk)'){throw 'On-demand seed must be empty, schema 2 and conditionally OFF.'}
+$boundary=Get-Content "$onDemandOwner/boundary.json" -Raw|ConvertFrom-Json -AsHashtable
+$create=@($boundary.Statement|Where-Object {'kinesisvideo:CreateStream'-in$_.Action})
+$delete=@($boundary.Statement|Where-Object {'kinesisvideo:DeleteStream'-in$_.Action})
+if($create.Count-ne 1-or$delete.Count-ne 1-or$create[0].Condition.StringEquals.'aws:RequestTag/Project'-ne$onDemand.project-or$delete[0].Condition.StringEquals.'aws:ResourceTag/Project'-ne$onDemand.project-or$create[0].Resource-notlike'*session-*'){throw 'On-demand boundary lost namespace/tag guards.'}
+foreach($case in @(@{concurrentSessions=0},@{admissionsPerDay=-1},@{admissionsPerMonth='50'},@{testerAdmissionsPerDay=$true},@{admissionAttemptsPerMinute=$null},@{sessionRequestsPerMinute=121},@{unexpected=1})){
+ $invalid=Get-Content $onDemandFile -Raw|ConvertFrom-Json -AsHashtable
+ $invalid.recordingLimits=$case
+ $invalid|ConvertTo-Json -Depth 8|Set-Content "$evidence/invalid-limit.json"
+ $rejected=$false;try{Read-InfrastructureConfiguration "$evidence/invalid-limit.json"|Out-Null}catch{$rejected=$true}
+ if(!$rejected){throw 'Invalid recording limit accepted.'}
+}
 @{Passed=$true;MockProviderOnly=$true;NoAwsCalls=$true;ControlSeedOff=$true;Evidence=$evidence} | ConvertTo-Json | Set-Content "$evidence/result.json"
 & pwsh -NoProfile -File "$PSScriptRoot/access/test-operations.ps1" *> "$evidence/operations-test.log"
 if($LASTEXITCODE){Get-Content "$evidence/operations-test.log";throw 'Offline operation guards failed.'}

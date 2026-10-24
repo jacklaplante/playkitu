@@ -105,6 +105,13 @@ resource "aws_dynamodb_table" "sessions" {
     name = "sessionOrder"
     type = "S"
   }
+  dynamic "attribute" {
+    for_each = local.c.stream_mode == "onDemand" ? { workShard = "S", workDue = "N" } : {}
+    content {
+      name = attribute.key
+      type = attribute.value
+    }
+  }
   ttl {
     attribute_name = "purgeAt"
     enabled        = true
@@ -119,6 +126,21 @@ resource "aws_dynamodb_table" "sessions" {
     key_schema {
       attribute_name = "sessionOrder"
       key_type       = "RANGE"
+    }
+  }
+  dynamic "global_secondary_index" {
+    for_each = local.c.stream_mode == "onDemand" ? [1] : []
+    content {
+      name            = "stream-work-by-due"
+      projection_type = "ALL"
+      key_schema {
+        attribute_name = "workShard"
+        key_type       = "HASH"
+      }
+      key_schema {
+        attribute_name = "workDue"
+        key_type       = "RANGE"
+      }
     }
   }
   # No snapshots/PITR copies of short-lived private session metadata.

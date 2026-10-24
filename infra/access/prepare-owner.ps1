@@ -30,8 +30,11 @@ $taskRoles = @($c.roles | ForEach-Object { "arn:aws:iam::${a}:role$($c.role_path
 $taskIssuer = "arn:aws:iam::${a}:role$($c.role_path)$($c.project)-issuer"
 $taskMedia = "arn:aws:iam::${a}:role$($c.role_path)$($c.project)-media"
 $taskTable = "arn:aws:dynamodb:${r}:${a}:table/$($c.table)"
-$taskStreams = @(1..$c.video_stream_count | ForEach-Object { "arn:aws:kinesisvideo:${r}:${a}:stream/$($c.project)-slot-$('{0:D2}' -f $_)/*" })
+$taskStreams = @([System.Linq.Enumerable]::Range(1,$c.video_stream_count) | ForEach-Object { "arn:aws:kinesisvideo:${r}:${a}:stream/$($c.project)-slot-$('{0:D2}' -f $_)/*" })
 $taskState = "arn:aws:s3:::$($c.state_bucket)"
+$taskSessionStreams = "arn:aws:kinesisvideo:${r}:${a}:stream/$($c.stream_name_prefix)session-$('?'*32)/*"
+$taskReadableStreams = @($taskStreams)
+if($c.stream_mode-ceq'onDemand'){$taskReadableStreams+=@($taskSessionStreams)}
 $taskRecording = "arn:aws:s3:::$($c.recording_bucket)"
 $taskFunction = "arn:aws:lambda:${r}:${a}:function:$($c.function)"
 $taskLogs = @("arn:aws:logs:${r}:${a}:log-group:/aws/lambda/$($c.function)","arn:aws:logs:${r}:${a}:log-group:/$($c.project)/api-access")
@@ -92,8 +95,8 @@ if (!$ApiId) {
 # policy is accidentally broadened. Actual role policies are substantially narrower.
 $taskBoundary = @(
     $taskSignin,
-    @{Effect='Allow';Action=@('dynamodb:GetItem','dynamodb:PutItem','dynamodb:UpdateItem','dynamodb:Query');Resource=@($taskTable,"$taskTable/index/sessions-by-day")},
-    @{Effect='Allow';Action=@('kinesisvideo:DescribeStream','kinesisvideo:GetDataEndpoint','kinesisvideo:PutMedia','kinesisvideo:ListFragments','kinesisvideo:GetMediaForFragmentList','kinesisvideo:GetClip');Resource=$taskStreams},
+    @{Effect='Allow';Action=@('dynamodb:GetItem','dynamodb:PutItem','dynamodb:UpdateItem','dynamodb:Query');Resource=@($taskTable,"$taskTable/index/sessions-by-day","$taskTable/index/stream-work-by-due")},
+    @{Effect='Allow';Action=@('kinesisvideo:DescribeStream','kinesisvideo:GetDataEndpoint','kinesisvideo:PutMedia','kinesisvideo:ListFragments','kinesisvideo:GetMediaForFragmentList','kinesisvideo:GetClip');Resource=$taskReadableStreams},
     @{Effect='Allow';Action=@('s3:ListBucket');Resource=@($taskState,$taskRecording)},
     @{Effect='Allow';Action=@('s3:GetObject','s3:PutObject');Resource=@("$taskRecording/sessions/*","$taskState/runtime/terraform.tfstate")},
     @{Effect='Allow';Action=@('s3:GetObject','s3:PutObject','s3:DeleteObject');Resource="$taskState/runtime/terraform.tfstate.tflock"},
@@ -104,10 +107,21 @@ $taskBoundary = @(
     @{Effect='Allow';Action=@('iam:PassRole');Resource=$taskIssuer;Condition=@{StringEquals=@{'iam:PassedToService'='lambda.amazonaws.com'}}},
     @{Effect='Allow';Action=@('apigateway:GET','apigateway:POST','apigateway:PATCH','apigateway:DELETE');Resource=@($taskApi,"$taskApi/*",$taskApiTags,"${taskApiTags}%2F*")}
 )
+
+if($c.stream_mode-ceq'onDemand'){
+    $taskBoundary+=@(
+        @{Effect='Allow';Action=@('dynamodb:ConditionCheckItem');Resource=$taskTable;Condition=@{'ForAllValues:StringEquals'=@{'dynamodb:LeadingKeys'=@('CONTROL')}}},
+        @{Effect='Allow';Action=@('kinesisvideo:DescribeStream','kinesisvideo:ListTagsForStream');Resource=$taskSessionStreams},
+        @{Effect='Allow';Action=@('kinesisvideo:CreateStream');Resource=$taskSessionStreams;Condition=@{
+            StringEquals=@{'aws:RequestTag/Project'=$c.project;'aws:RequestTag/ManagedBy'='playkitu'};
+            StringLike=@{'aws:RequestTag/Admission'=('?'*32)};'ForAllValues:StringEquals'=@{'aws:TagKeys'=@('Project','ManagedBy','Admission')}}},
+        @{Effect='Allow';Action=@('kinesisvideo:DeleteStream');Resource=$taskSessionStreams;Condition=@{
+            StringEquals=@{'aws:ResourceTag/Project'=$c.project;'aws:ResourceTag/ManagedBy'='playkitu'};StringLike=@{'aws:ResourceTag/Admission'=('?'*32)}}}
+    )
+}
+# IAM mutation enumerates five child roles; CreateRole must supply the immutable
 $taskBoundaryLength = Save-Policy 'boundary.json' $taskBoundary
 if ($taskBoundaryLength -gt 6144) { throw 'Boundary exceeds managed policy quota.' }
-
-# IAM mutation enumerates five child roles; CreateRole must supply the immutable
 # ceiling. There is no seed/operator/boundary mutation or policy-attachment path.
 $taskSeed = @(
     $taskSignin,
@@ -145,6 +159,7 @@ $taskSeed = @(
     @{Effect='Allow';Action=@('budgets:ViewBudget','budgets:ModifyBudget','budgets:ListTagsForResource','budgets:TagResource','budgets:UntagResource');Resource="arn:aws:budgets::${a}:budget/$($c.budget)"}
 )
 # Enforce the window on already issued sessions too, not just future AssumeRole.
+$taskSeed=@($taskSeed|Where-Object {$_.Resource -isnot [array] -or $_.Resource.Count -gt 0})
 $taskSeed += $taskWindowDenies
 $taskSeed += @{Effect='Deny';Action=@('secretsmanager:GetSecretValue','secretsmanager:PutSecretValue','secretsmanager:UpdateSecret');Resource='*'}
 # Split owner inline policies below the aggregate 10,240-character role quota;

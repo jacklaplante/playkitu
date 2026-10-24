@@ -1,8 +1,9 @@
-# On-demand recordings: proposed replacement for shared slots
+# On-demand recordings
 
-**Status: design proposal, not implemented or deployed.** The maintained backend
-still uses the shared pool described in [capacity](capacity.md). Raising its size
-does not implement this design. No cloud change follows from this document.
+**Status: implemented and validated offline; live migration not performed.** New
+installations explicitly select `streamMode: "onDemand"`. Omitting that field keeps
+pooled compatibility for existing installations. See [configuration and migration](capacity.md).
+Preparing or testing this source does not change any running deployment.
 
 ## Target behavior
 
@@ -23,8 +24,9 @@ of infinite AWS capacity or a billing cap.
    and global heartbeat writes with per-session records and conditional per-tester
    ownership leases. Lease deadlines remain explicit; DynamoDB TTL is cleanup,
    not permission to take a live lease. Keep global recording controls, but do
-   not update them on every session heartbeat. Optional exact aggregate quotas
-   must have an explicit enforcement/throughput design, not an unbounded map.
+   not update them on every session heartbeat. Exact scalar counters serialize
+   admission/retirement, not heartbeats. They are tracked even with caps disabled,
+   so later enabling a cap preserves period totals. There is no unbounded map.
 2. **Idempotent allocation.** Reserve a durable allocation/cleanup record before
    creating a stream. Derive its immutable name from the server-generated
    admission identity, not a caller-selected stream name or reusable session UUID
@@ -52,7 +54,7 @@ of infinite AWS capacity or a billing cap.
    server-owned metadata within the configured trust namespace. Retain pooled
    slot lookup for old recordings. Update receipts/catalog validation and the
    library without weakening fragment attribution or leaking another session.
-   Paginate the session catalogue beyond the current 50-per-day display bound.
+   The session catalogue uses bounded continuation pages beyond fifty per day.
 7. **Configurable controls.** Replace embedded active/daily/monthly counts with
    validated owner settings and optional disabled count caps. Publish the effective
    settings and distinct rejection reasons. Bound authentication attempts, stream

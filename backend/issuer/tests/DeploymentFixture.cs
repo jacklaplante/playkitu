@@ -3,9 +3,11 @@ namespace Playkitu.Tests;
 
 public static class DeploymentFixture
 {
-    public static IssuerOptions Create(string account = "123456789012", string region = "us-east-2", int app = 123456, string identityPrefix = "pkrec2:", string identityDomain = "playkitu-recording:", int streams = 4) => new()
+    public static IssuerOptions Create(string account = "123456789012", string region = "us-east-2", int app = 123456, string identityPrefix = "pkrec2:", string identityDomain = "playkitu-recording:", int streams = 4,
+        string streamMode = "pooled", RecordingLimits? limits = null) => new()
     {
         AwsAccountId = account, AwsRegion = region, SteamAppId = app,
+        StreamMode = streamMode, RecordingLimits = limits ?? new(),
         IdentityPrefix = identityPrefix, IdentityDomain = identityDomain,
         Project = "playkitu", RolePath = "/playkitu/", Table = "playkitu",
         IssuerOrigin = $"https://abc123def4.execute-api.{region}.amazonaws.com",
@@ -13,6 +15,6 @@ public static class DeploymentFixture
         PublisherSecretArn = $"arn:aws:secretsmanager:{region}:{account}:secret:playkitu/publisher-key-AbCd12",
         MediaRoleArn = $"arn:aws:iam::{account}:role/playkitu/playkitu-media",
         RetrievalRoleArn = $"arn:aws:iam::{account}:role/playkitu/playkitu-retrieval",
-        StreamArns = Enumerable.Range(1, streams).Select(i => $"arn:aws:kinesisvideo:{region}:{account}:stream/playkitu-slot-{i:D2}/1234").ToArray()
+        StreamArns = Enumerable.Range(1, streamMode == "onDemand" ? 0 : streams).Select(i => $"arn:aws:kinesisvideo:{region}:{account}:stream/playkitu-slot-{i:D2}/1234").ToArray()
     };
 }

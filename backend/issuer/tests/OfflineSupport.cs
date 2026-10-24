@@ -61,10 +61,14 @@ public sealed class MemoryDynamo : AmazonDynamoDBClient
         lock (gate)
         {
             Transactions.Add(request);
-            var puts = request.TransactItems.Select(i => i.Put ?? throw new InvalidOperationException("Unexpected transaction action.")).ToArray();
-            var identities = puts.Select(p => (p.Item["pk"].S, p.Item["sk"].S)).ToArray();
-            if (identities.Distinct().Count() != puts.Length || puts.Length > 100) throw new InvalidOperationException("Invalid Dynamo transaction.");
-            foreach (var put in puts)
+            var puts = request.TransactItems.Where(i => i.Put is not null).Select(i => i.Put).ToArray();
+            var checks = request.TransactItems.Where(i => i.ConditionCheck is not null).Select(i => new Put {
+                Item = i.ConditionCheck.Key, ConditionExpression = i.ConditionCheck.ConditionExpression,
+                ExpressionAttributeNames = i.ConditionCheck.ExpressionAttributeNames, ExpressionAttributeValues = i.ConditionCheck.ExpressionAttributeValues }).ToArray();
+            var actions = puts.Concat(checks).ToArray();
+            var identities = actions.Select(p => (p.Item["pk"].S, p.Item["sk"].S)).ToArray();
+            if (actions.Length != request.TransactItems.Count || identities.Distinct().Count() != actions.Length || actions.Length > 100) throw new InvalidOperationException("Invalid Dynamo transaction.");
+            foreach (var put in actions)
             {
                 rows.TryGetValue((put.Item["pk"].S, put.Item["sk"].S), out var previous);
                 var valid = put.ConditionExpression == "attribute_not_exists(#pk)" ? previous is null :
@@ -85,6 +89,17 @@ public sealed class MemoryDynamo : AmazonDynamoDBClient
                 throw new AmazonDynamoDBException("OFFLINE sensitive exception must not escape", ErrorType.Receiver, "InternalServerError", "offline", HttpStatusCode.InternalServerError);
             }
             return new();
+        }
+    }
+    public override Task<QueryResponse> QueryAsync(QueryRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (request.IndexName != "stream-work-by-due") throw new InvalidOperationException("Unexpected offline index.");
+        lock (gate) {
+            var due = long.Parse(request.ExpressionAttributeValues[":due"].N);
+            return Task.FromResult(new QueryResponse { Items = rows.Values.Where(r => r.TryGetValue("workShard", out var shard)
+                && shard.S == request.ExpressionAttributeValues[":shard"].S && long.Parse(r["workDue"].N) <= due)
+                .OrderBy(r => long.Parse(r["workDue"].N)).Take(request.Limit!.Value).Select(Clone).ToList() });
         }
     }
     public void ChangeControl(Action<GlobalState>? change = null, bool? enabled = null)
@@ -162,14 +177,14 @@ public sealed class Fixture
     public IssuerService Service;
     public Function Handler;
     public IssuerOptions Options = Playkitu.Tests.DeploymentFixture.Create();
-    public Fixture(IssuerOptions? options = null)
+    public Fixture(IssuerOptions? options = null, ISessionStreams? streams = null)
     {
         if (options is not null) Options = options;
         Sts = new(Clock); Store = new(Db, Options.Table);
         var s3 = new AmazonS3Client(new SessionAWSCredentials("OFFLINE-SIGNER", "OFFLINE-SIGNER-SECRET", "OFFLINE-SIGNER-TOKEN"),
             new AmazonS3Config { RegionEndpoint = RegionEndpoint.USEast2, HttpClientFactory = new BlockedFactory() });
         Service = new(Store, new ValveVerifier(new HttpClient(Valve), new(Secrets, Options.PublisherSecretArn, Clock), Options.SteamAppId),
-            new StsMediaIssuer(Sts, Options.MediaRoleArn), new S3UploadSigner(s3, Options.Bucket), Options, Clock);
+            new StsMediaIssuer(Sts, Options.MediaRoleArn), new S3UploadSigner(s3, Options.Bucket), Options, Clock, streams);
         Handler = new(Service, Clock);
     }
     public StartRequest Start(int salt = 0) => new(1, Guid.NewGuid(), Clock.GetUtcNow().ToUnixTimeSeconds(),

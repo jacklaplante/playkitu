@@ -35,8 +35,10 @@ it. AWS login expiry requires ordinary sign-in and restarting the app, not new
 permissions. Browser access never changes recording controls or cloud resources.
 
 Sessions are read from the retained day index; expired/stale index entries are
-skipped. Fifty results per day is the display bound (above the supplied eight/day
-admission limit); reaching it shows an explicit truncation notice. Live sessions
+skipped. Each request returns at most fifty sessions; **Load more playtests**
+continues through the selected days with an opaque continuation cursor. There is
+no fifty-per-day display ceiling. Changing the date range starts a new listing.
+Live sessions
 are partial observations. Video is kept in separately playable parts, preserving
 missing-footage warnings rather than silently stitching gaps. A whole download
 is bounded to two hours, 16 GiB of media-window transfers, and 64 ten-minute

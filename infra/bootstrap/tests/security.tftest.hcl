@@ -26,6 +26,39 @@ variables {
   api_id                 = "abc123def4"
 }
 
+run "on_demand_has_no_pool_and_only_scoped_stream_management" {
+  command = apply
+  variables {
+    configuration_file  = "../deployment.on-demand.example.json"
+    runtime_ready       = true
+    owner_logging_ready = true
+  }
+  assert {
+    condition = length(aws_kinesis_video_stream.slot) == 0 && anytrue([
+      for index in aws_dynamodb_table.sessions.global_secondary_index : index.name == "stream-work-by-due" && index.projection_type == "ALL"
+    ])
+    error_message = "On-demand uses a durable due-work index, not a precreated pool."
+  }
+  assert {
+    condition     = aws_cloudwatch_event_rule.cleanup.schedule_expression == "rate(1 minute)" && jsondecode(aws_cloudwatch_event_target.cleanup[0].input).version == "playkitu.cleanup.v1"
+    error_message = "On-demand cleanup must use the private scheduled event every minute."
+  }
+  assert {
+    condition = alltrue([for statement in jsondecode(aws_iam_role_policy.project["issuer"].policy).Statement :
+      !contains(statement.Action, "kinesisvideo:CreateStream") ? true :
+      (statement.Resource == local.session_streams && statement.Condition.StringEquals["aws:RequestTag/Project"] == "playkitu" && statement.Condition.StringEquals["aws:RequestTag/ManagedBy"] == "playkitu")
+    ]) && anytrue([for statement in jsondecode(aws_iam_role_policy.project["issuer"].policy).Statement : contains(statement.Action, "kinesisvideo:CreateStream")])
+    error_message = "Creation must be restricted to admission names and required ownership tags."
+  }
+  assert {
+    condition = alltrue([for statement in jsondecode(aws_iam_role_policy.project["issuer"].policy).Statement :
+      !contains(statement.Action, "kinesisvideo:DeleteStream") ? true :
+      (statement.Resource == local.session_streams && statement.Condition.StringEquals["aws:ResourceTag/Project"] == "playkitu" && statement.Condition.StringEquals["aws:ResourceTag/ManagedBy"] == "playkitu")
+    ]) && alltrue([for name in ["media", "retrieval", "deploy", "operations"] : !strcontains(aws_iam_role_policy.project[name].policy, "kinesisvideo:DeleteStream") && !strcontains(aws_iam_role_policy.project[name].policy, "kinesisvideo:CreateStream")])
+    error_message = "Only the issuer manages tagged session streams; clients and human retrieval roles do not."
+  }
+}
+
 run "owner_storage_and_boundaries" {
   command = apply
   assert {

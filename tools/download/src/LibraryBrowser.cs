@@ -85,12 +85,12 @@ public static class LibraryBrowser
         using var reader = new StreamReader(resource); var html = await reader.ReadToEndAsync(ct);
         app.MapGet(token + "/", () => Results.Content(html, "text/html"));
         app.MapGet(token + "/logo", () => Results.Stream(typeof(LibraryBrowser).Assembly.GetManifestResourceStream("Playkitu.Logo.png")!, "image/png"));
-        app.MapGet(token + "/sessions", async (string from, string to, CancellationToken cancel) => {
+        app.MapGet(token + "/sessions", async (string from, string to, string? cursor, CancellationToken cancel) => {
             if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var first)
                 || !DateOnly.TryParseExact(to, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var last))
                 throw new RetrievalError("invalid_day");
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel); deadline.CancelAfter(TimeSpan.FromMinutes(2));
-            return Results.Json(await library.ListAsync(first, last, deadline.Token), Wire.Json);
+            return Results.Json(await library.ListAsync(first, last, deadline.Token, cursor), Wire.Json);
         });
         app.MapPost(token + "/download/{session:guid}", async (Guid session) => {
             if (session == Guid.Empty) return Results.BadRequest();

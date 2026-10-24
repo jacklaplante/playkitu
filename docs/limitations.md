@@ -8,15 +8,16 @@ describe the maintained source, not the state of a particular AWS installation.
 
 | Limit | Current behavior | Changing it |
 | --- | --- | --- |
-| Video pool | Four streams by default; one leased stream per video session. Full or quarantined slots can leave an admitted session with logs only. There is no waiting room guaranteeing later video. | `videoStreamCount` supports 1–8. An existing installation needs a coordinated resize, not just a JSON edit. |
-| Slot reuse | A released stream stays unavailable until 50 minutes after its last media credential expires. A fresh credential lasts 15 minutes, so reuse can be delayed roughly 65 minutes after an early close. | This protects against a previous client writing into the next session. It is source behavior, not a pool-size setting. |
-| Active sessions | Eight active sessions globally, one per tester; pending admission is separately bounded. | Backend code and validation/load review. More streams alone do not raise this. |
-| Daily/monthly quota | Eight successful admissions per tester per UTC day, eight globally per UTC day, fifty globally per UTC month. Closing or recording failure does not refund an admission. Logs-only admissions count too. | Backend code, deployment and policy review; these are not currently deployment JSON fields. |
+| Stream allocation | Explicit `onDemand` mode creates a private stream for each admission, with no pool or reuse cooldown. Creation may take several polls; failure cannot guarantee footage. | Use the on-demand deployment example. Existing installations need the migration below. |
+| Count caps | On-demand concurrent, daily, monthly and per-tester daily caps are deployment JSON fields. `null` disables an application count cap; positive integers enforce one. Reservations count even if capture subsequently fails. | `recordingLimits`; one active/preparing session per tester remains enforced. |
+| Service capacity | AWS stream/API/database/Lambda quotas, admission-counter contention and request throttles still bound throughput. Retained recordings consume stream quota until cleanup deletes their streams. | Review actual account quotas, rates, costs and load; disabling count caps is not infinite capacity. |
+| Legacy pooled mode | Omitting `streamMode` preserves the old four-stream default, 1–8 configurable streams, roughly 65-minute reuse delay, eight active sessions, eight admissions/day and fifty/month. Extra admissions can be logs-only. | A coordinated migration to on-demand removes those pool constraints; a source update alone does not change live AWS. |
 
-Pool size is configurable; the system is **not automatically elastic**. The same
-pool can remain full after testers have quit because of quarantine. See the
-[capacity/migration guide](capacity.md), `backend/issuer/src/IssuerService.cs`,
-`State.cs` and `Contracts.cs` before changing these rules.
+The on-demand implementation and failure cases have offline regression coverage;
+live stream creation, cleanup and throughput are separate deployment proof gates.
+See the [capacity/migration guide](capacity.md) for defaults, failure behavior and
+the required state/permissions migration. Never reseed existing CONTROL or delete
+old pooled streams to switch modes.
 
 ## Capture and compatibility
 

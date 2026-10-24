@@ -21,5 +21,6 @@
     <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.101.4" />
     <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.100.19" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.104.4" />
+    <PackageReference Include="AWSSDK.KinesisVideo" Version="[4.0.100.19]" />
   </ItemGroup>
 </Project>

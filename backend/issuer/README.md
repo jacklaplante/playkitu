@@ -46,7 +46,7 @@ using Valve's `str:` representation and requires an active app ownership verdict
 Consent validation precedes authentication/state mutation. Replay fencing,
 canonical 256-bit bearer proofs, immutable bindings and atomic reservations remain.
 
-Limits: a configured pool of 1–8 precreated streams (four by default), eight active/pending admissions, one session per
+Pooled compatibility limits: a configured pool of 1–8 precreated streams (four by default), eight active/pending admissions, one session per
 tester; eight successful admissions/tester/UTC day, eight globally/day and fifty
 monthly, without refunds. Sessions have a 14,400-second media deadline and
 180-second inactivity timeout. Optional negotiated diagnostic finalization is
@@ -61,6 +61,18 @@ Closing does not refund an admission. Full/quarantined video pools can admit
 logs-only sessions; slot reuse waits until 50 minutes after the last credential's
 expiry. See [current limitations](../../docs/limitations.md) and
 [safe capacity changes](../../docs/capacity.md).
+
+With explicit `streamMode: "onDemand"`, CONTROL schema 2 and the matching IAM/
+cleanup infrastructure, the service instead allocates a unique stream for each
+verified admission. `recordingLimits` configures concurrent/day/month/tester count
+caps (null disables them), admission attempts/minute and per-session requests/minute.
+Count reservations are durable before creation; retries recover the same admission.
+Verified pending admissions resume after contention without a new Steam request.
+Heartbeats use session/tester/work records and a CONTROL condition check, not a
+global active-session map write. Exact usage counters serialize admissions and
+retirement. The internal scheduled event `version=playkitu.cleanup.v1` reconciles
+lease expiry and retained stream retirement; errors fail the Lambda invocation.
+Read [configuration, retention and migration](../../docs/capacity.md) before use.
 
 `seed.ps1` emits the canonical model's initial CONTROL item OFF/OFF, without
 constructing AWS clients. The infrastructure helper wraps it in a conditional

@@ -79,8 +79,8 @@ resource "aws_lambda_function" "issuer" {
   filename                       = var.issuer_zip
   source_code_hash               = filebase64sha256(var.issuer_zip)
   memory_size                    = 256
-  timeout                        = 15
-  reserved_concurrent_executions = 2
+  timeout                        = local.c.stream_mode == "onDemand" ? 60 : 15
+  reserved_concurrent_executions = coalesce(local.c.lambda_concurrency, -1)
   ephemeral_storage { size = 512 }
   environment {
     variables = {
@@ -98,6 +98,8 @@ resource "aws_lambda_function" "issuer" {
         mediaRoleArn       = var.media_role_arn
         retrievalRoleArn   = "arn:aws:iam::${local.c.account}:role${local.c.role_path}${local.c.project}-retrieval"
         streamArns         = var.stream_arns
+        streamMode         = local.c.stream_mode
+        recordingLimits    = local.c.recording_limits
         identityPrefix     = local.c.identity_prefix
         identityDomain     = local.c.identity_domain
       })

@@ -180,6 +180,7 @@
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.11, )",
           "AWSSDK.DynamoDBv2": "[4.0.107.3, )",
+          "AWSSDK.KinesisVideo": "[4.0.100.19, 4.0.100.19]",
           "AWSSDK.S3": "[4.0.104.4, )",
           "AWSSDK.SecretsManager": "[4.0.100.19, )",
           "AWSSDK.SecurityToken": "[4.0.101.4, )",

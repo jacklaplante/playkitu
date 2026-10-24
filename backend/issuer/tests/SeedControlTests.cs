@@ -4,6 +4,18 @@ namespace Issuer.Tests;
 [TestFixture]
 public sealed class SeedControlTests
 {
+    [Test] public void OnDemandSeedUsesNewSchemaWithNoPoolAndBothSwitchesOff()
+    {
+        using var output = new StringWriter(); var before = Console.Out;
+        try { Console.SetOut(output); Assert.That(Playkitu.Issuer.Program.Main(["--seed-control", "--stream-mode", "onDemand"]), Is.Zero); }
+        finally { Console.SetOut(before); }
+        using var doc = JsonDocument.Parse(output.ToString());
+        using var state = JsonDocument.Parse(doc.RootElement.GetProperty("data").GetProperty("S").GetString()!);
+        Assert.That(state.RootElement.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(2));
+        Assert.That(state.RootElement.GetProperty("slots").GetArrayLength(), Is.Zero);
+        Assert.That(doc.RootElement.GetProperty("admissionsEnabled").GetProperty("BOOL").GetBoolean(), Is.False);
+        Assert.That(doc.RootElement.GetProperty("uploadsEnabled").GetProperty("BOOL").GetBoolean(), Is.False);
+    }
     [TestCase(1)] [TestCase(8)]
     public void SeedUsesConfiguredStreamCountWithoutEnablingRecording(int count)
     {

@@ -123,7 +123,7 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
             if (timing.LatestManifest < 0) bundle.Issues.Add("manifest_unavailable");
             bundle.Issues.AddRange(timing.Uncertainties.Distinct());
             await ReconstructLogsAsync(output, bundle, timing, token);
-            if (session.Slot >= 0) await FetchMediaAsync(output, bundle, timing, session.Slot, budget, token);
+            if (session.OnDemand && session.StreamArn is not null || session.Slot >= 0) await FetchMediaAsync(output, bundle, timing, session, budget, token);
             else bundle.Issues.Add("logs_only_session");
             }
             bundle.Status = bundle.Issues.Count == 0 ? "retrieved" : "incomplete";
@@ -138,11 +138,11 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
         return bundle;
     }
 
-    private async Task FetchMediaAsync(string output, RetrievalBundle bundle, TimingEvidence timing, int slot, TransferBudget budget, CancellationToken ct)
+    private async Task FetchMediaAsync(string output, RetrievalBundle bundle, TimingEvidence timing, SessionState session, TransferBudget budget, CancellationToken ct)
     {
         var ranges = timing.MergedRanges(limits, bundle.Window);
         if (ranges.Count == 0) { bundle.Issues.Add("producer_range_unavailable"); return; }
-        var arn = await store.StreamArnAsync(slot, ct); var selectedIds = new HashSet<string>();
+        var arn = await store.SessionStreamArnAsync(session, ct); var selectedIds = new HashSet<string>();
         var claimOwners = timing.Claims.Where(c => c.IsPersisted).GroupBy(c => c.Id);
         if (claimOwners.Any(g => g.Select(c => (c.RunId, c.Epoch, c.Upload)).Distinct().Count() != 1
             || g.Where(c => c.TimecodeMs.HasValue).Select(c => c.TimecodeMs).Distinct().Count() > 1)) throw new RetrievalError("ambiguous_fragment_claim");

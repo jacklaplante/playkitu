@@ -22,11 +22,17 @@ public class Deployment
     public string MediaRoleArn { get; init; } = "";
     public string RetrievalRoleArn { get; init; } = "";
     public string[] StreamArns { get; init; } = [];
+    // Omitted mode retains explicit compatibility with existing pooled installs.
+    // New installations select onDemand and never allocate reusable slots.
+    public string StreamMode { get; init; } = "pooled";
+    public bool OnDemand => StreamMode == "onDemand";
+    public RecordingLimits RecordingLimits { get; init; } = new();
     public string IdentityPrefix { get; init; } = Playkitu.Client.RecordingIdentity.Prefix;
     public string IdentityDomain { get; init; } = "playkitu-recording:";
 
     public void Validate()
     {
+        RecordingLimits.Validate();
         static bool Match(string? text, string pattern) => text is not null && Regex.IsMatch(text, "\\A" + pattern + "\\z", RegexOptions.CultureInvariant);
         if (!Match(AwsAccountId, "[0-9]{12}") || !Match(AwsRegion, "[a-z]{2}-[a-z]+-[0-9]") || SteamAppId <= 0
             || !Match(Project, "[a-z][a-z0-9-]{1,40}") || !Match(RolePath, "/[A-Za-z0-9_/-]+/")
@@ -41,10 +47,23 @@ public class Deployment
         var role = $"arn:aws:iam::{AwsAccountId}:role{RolePath}{Project}-";
         if (MediaRoleArn != role + "media" || RetrievalRoleArn != role + "retrieval"
             || !Match(PublisherSecretArn, $"arn:aws:secretsmanager:{Regex.Escape(AwsRegion)}:{AwsAccountId}:secret:{Regex.Escape(Project)}/publisher-key-[A-Za-z0-9]{{6}}")
-            || StreamArns.Length is < 1 or > MaxVideoStreams || StreamArns.Distinct().Count() != StreamArns.Length
+            || StreamMode is not ("pooled" or "onDemand")
+            // In on-demand mode this optional list is read-only compatibility
+            // metadata for retained pooled recordings, never an allocation pool.
+            || (OnDemand ? StreamArns.Length > MaxVideoStreams : StreamArns.Length is < 1 or > MaxVideoStreams)
+            || StreamArns.Distinct().Count() != StreamArns.Length
             || StreamArns.Where((arn, i) => !Match(arn, $"arn:aws:kinesisvideo:{Regex.Escape(AwsRegion)}:{AwsAccountId}:stream/{Regex.Escape(StreamNamePrefix)}{i + 1:D2}/[0-9]+")).Any())
             throw new InvalidOperationException("Deployment resources must match owner trust.");
     }
+
+    public string SessionStreamName(string admissionId)
+    {
+        if (!Regex.IsMatch(admissionId, "\\A[a-f0-9]{32}\\z")) throw new InvalidOperationException("Invalid admission identity.");
+        return StreamNamePrefix + "session-" + admissionId;
+    }
+    public bool IsSessionStream(string arn, string admissionId) => Regex.IsMatch(arn ?? "",
+        "\\Aarn:aws:kinesisvideo:" + Regex.Escape(AwsRegion) + ":" + AwsAccountId + ":stream/"
+        + Regex.Escape(SessionStreamName(admissionId)) + "/[0-9]+\\z");
 
     public static Deployment Load(string path)
     {
