@@ -1,0 +1,13 @@
+{
+  "name": "Playkitu.Sample",
+  "references": [
+    "Playkitu.Client",
+    "Playkitu.Gameplay",
+    "Playkitu.Producer",
+    "Playkitu.Native"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ]
+}

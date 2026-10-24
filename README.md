@@ -1,13 +1,13 @@
-<p align="center"><img src="docs/assets/banner.svg" alt="playreel: playtest recordings for more playful games" width="960" /></p>
+<p align="center"><img src="docs/assets/playkitu.png" alt="playkitu: playtest recordings for more playful games" width="960" /></p>
 
 <p align="center"><strong>Gameplay, game audio, optional voice, and the logs that explain what happened.</strong></p>
 <p align="center"><strong>Free and open source</strong> · Unity · Windows 64-bit (x86-64) only (as of right now) · Steam</p>
 
-playreel helps developers see their game through a playtester's eyes. Players consent and play. Recordings stream while the game runs, and matching diagnostic logs give developers context for improving the game.
+playkitu helps developers see their game through a playtester's eyes. Players consent and play. Recordings stream while the game runs, and matching diagnostic logs give developers context for improving the game.
 
-**Free and open source:** the original project code is [MIT licensed](LICENSE). There is no playreel subscription or software fee. You deploy the backend in your own AWS account and pay its infrastructure and usage costs.
+**Free and open source:** the original project code is [MIT licensed](LICENSE). There is no playkitu subscription or software fee. You deploy the backend in your own AWS account and pay its infrastructure and usage costs.
 
-**Contributions welcome!** Help make playreel useful for more developers: bug fixes, documentation, examples, testing and support for more platforms are all welcome. [Get involved](CONTRIBUTING.md).
+**Contributions welcome!** Help make playkitu useful for more developers: bug fixes, documentation, examples, testing and support for more platforms are all welcome. [Get involved](CONTRIBUTING.md).
 
 **Current recording support: Windows 64-bit (x86-64) only.** The Unity recording client and native runtime currently support this platform. macOS, Linux, 32-bit Windows and native ARM64 players are not supported yet; contributions toward broader platform support are welcome. This platform restriction applies to the recording client; the supplied backend runs on AWS.
 
@@ -31,8 +31,8 @@ Testers need no recording account, invitation code, external recorder or end-of-
 Open **samples/MinimalUnity** in **Unity 2022.3.62f3**. Open **Assets/OfflineConsent.unity** and enter Play Mode. Check consent, run the local lifecycle check, then stop and remove the recorder.
 
 ~~~powershell
-git clone https://github.com/jacklaplante/playreel.git
-cd playreel
+git clone https://github.com/jacklaplante/playkitu.git
+cd playkitu
 ~~~
 
 This exercises the real host/controller with an offline, disabled issuer. **It does not record, open a microphone, request Steam tickets or contact AWS.**
@@ -50,18 +50,20 @@ This needs Windows x64, PowerShell 7, Git and Visual Studio C++/Windows SDK tool
 ## Use it in a game
 
 1. [Build the native runtime](native/README.md) and [deploy the backend](infra/README.md) in your own AWS account. Recording starts **OFF**.
-2. Install **com.playreel.recording** with Unity Package Manager using the Git URL below. For local development, select **packages/com.playreel.recording/package.json** using Add package from disk.
+2. Install **com.playkitu.recording** with Unity Package Manager using the Git URL below. For local development, select **packages/com.playkitu.recording/package.json** using Add package from disk.
 3. Supply trusted deployment settings, an existing Steam ticket owner and a packaged native runtime path.
-4. Connect your consent UI and lifecycle to **PlayreelRecorder**. Keep microphone consent separate; allow gameplay to continue if recording fails after required consent.
+4. Connect your consent UI and lifecycle to **PlaykituRecorder**. Keep microphone consent separate; allow gameplay to continue if recording fails after required consent.
 5. Run a consented integration test, then retrieve its video and logs with the [download tool](tools/download/README.md).
 
 The [Unity guide](docs/unity-integration.md) covers the API, Steamworks.NET example, build inclusion and removal. The [AWS guide](infra/README.md) covers roles, key setup, OFF controls, alerts and state. Cloning or importing this repository does not provision or activate AWS.
 
 ~~~text
-https://github.com/jacklaplante/playreel.git?path=/packages/com.playreel.recording#v0.1.0
+https://github.com/jacklaplante/playkitu.git?path=/packages/com.playkitu.recording#v0.2.0
 ~~~
 
 ## How it works
+
+Upgrading from playreel? See the [rename and compatibility notes](docs/renaming.md).
 
 ~~~mermaid
 flowchart LR
@@ -98,13 +100,13 @@ Capture is limited to the game view, game audio, an explicitly enabled microphon
 
 AWS infrastructure, storage, traffic and retrieval incur charges in **your** account. Conservative quotas and spending/error alerts are supplied. Alerts are delayed notifications, not hard billing caps. See [costs and controls](infra/README.md#fixed-architecture-and-limits).
 
-Uninstalling client code does not delete retained recordings or paid infrastructure. [Removal instructions](docs/unity-integration.md#removing-playreel) distinguish those operations.
+Uninstalling client code does not delete retained recordings or paid infrastructure. [Removal instructions](docs/unity-integration.md#removing-playkitu) distinguish those operations.
 
 ## Repository
 
 | Location | Contents |
 | --- | --- |
-| packages/com.playreel.recording | Unity capture, lifecycle, uploads and tests |
+| packages/com.playkitu.recording | Unity capture, lifecycle, uploads and tests |
 | native | Native source, SDK patches, pinned build tooling and tests |
 | backend/issuer | Steam verification and scoped authorization |
 | infra | Terraform, owner policies, controls and offline validation |

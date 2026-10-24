@@ -1,8 +1,8 @@
 using System.Text.Json;
 using NUnit.Framework;
-using Playreel.Client;
-using Playreel.Issuer;
-using Playreel.Tests;
+using Playkitu.Client;
+using Playkitu.Issuer;
+using Playkitu.Tests;
 
 namespace Issuer.Tests;
 

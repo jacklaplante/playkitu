@@ -35,12 +35,12 @@ try {
     $taskEntries = [IO.Compression.ZipFile]::OpenRead($taskArtifact)
     try {
         $taskNames = @($taskEntries.Entries.FullName)
-        foreach($taskRequired in 'Playreel.Issuer.dll','Playreel.Issuer.deps.json','Playreel.Issuer.runtimeconfig.json','Amazon.Lambda.Core.dll','AWSSDK.S3.dll','AWSSDK.DynamoDBv2.dll') {
+        foreach($taskRequired in 'Playkitu.Issuer.dll','Playkitu.Issuer.deps.json','Playkitu.Issuer.runtimeconfig.json','Amazon.Lambda.Core.dll','AWSSDK.S3.dll','AWSSDK.DynamoDBv2.dll') {
             if ($taskRequired -notin $taskNames) { throw "Missing publish entry: $taskRequired" }
         }
         if ($taskNames | Where-Object { $_ -match 'Tests|NUnit|\.pdb$|\.ps1$|private/|^/' }) { throw 'Unexpected publish payload.' }
         $taskReceipt = if ($OutputDirectory) { Join-Path $taskOut 'artifact.json' } else { Join-Path $taskPrivate 'evidence/artifact.json' }
-        [ordered]@{Sdk='10.0.402';Runtime='dotnet10';Architecture='x86_64';Handler='Playreel.Issuer::Playreel.Issuer.Function::HandleAsync';Sha256=(Get-FileHash -LiteralPath $taskArtifact).Hash;Bytes=(Get-Item -LiteralPath $taskArtifact).Length;Entries=$taskNames} |
+        [ordered]@{Sdk='10.0.402';Runtime='dotnet10';Architecture='x86_64';Handler='Playkitu.Issuer::Playkitu.Issuer.Function::HandleAsync';Sha256=(Get-FileHash -LiteralPath $taskArtifact).Hash;Bytes=(Get-Item -LiteralPath $taskArtifact).Length;Entries=$taskNames} |
             ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $taskReceipt
     } finally { $taskEntries.Dispose() }
     Write-Output "Packaged $taskArtifact"

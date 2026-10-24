@@ -412,7 +412,7 @@ void timer(Run* r) noexcept {
 }
 }
 extern "C" uint32_t __cdecl sbrec_runner_abi_version() noexcept { return 1; }
-#ifndef PLAYREEL_REGION_CAPABILITY_NEGATIVE
+#ifndef PLAYKITU_REGION_CAPABILITY_NEGATIVE
 extern "C" uint32_t __cdecl sbrec_runner_trusted_region_version() noexcept { return 1; }
 #endif
 extern "C" uint32_t __cdecl sbrec_runner_clock(SbrecClock* out) noexcept { if(!out) return RUN_INVALID; *out=clock_now(); return RUN_OK; }

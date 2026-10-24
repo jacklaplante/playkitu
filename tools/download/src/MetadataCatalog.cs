@@ -3,10 +3,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Security.Cryptography;
 using System.Text;
-using Playreel.Client;
-using Playreel.Issuer;
+using Playkitu.Client;
+using Playkitu.Issuer;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 // Selection is in KVS producer fragment-start time, not physical capture time.
 // Original objects remain immutable; this scope only bounds their aggregation.

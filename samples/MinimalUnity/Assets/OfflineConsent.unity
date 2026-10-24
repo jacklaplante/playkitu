@@ -7,7 +7,7 @@ GameObject:
   - component: {fileID: 1001}
   - component: {fileID: 1002}
   m_Layer: 0
-  m_Name: playreel offline consent
+  m_Name: playkitu offline consent
   m_TagString: Untagged
   m_IsActive: 1
 --- !u!4 &1001

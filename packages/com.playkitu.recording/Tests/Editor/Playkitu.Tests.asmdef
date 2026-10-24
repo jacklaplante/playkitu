@@ -1,0 +1,23 @@
+{
+  "name": "Playkitu.Tests",
+  "references": [
+    "Playkitu.Client",
+    "Playkitu.Native",
+    "Playkitu.Gameplay",
+    "Playkitu.Producer",
+    "Playkitu.Unity",
+    "Playkitu.Steam",
+    "Unity.Newtonsoft.Json"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ]
+}

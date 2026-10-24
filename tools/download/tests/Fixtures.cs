@@ -1,5 +1,5 @@
-using Playreel.Issuer;
-using Playreel.Retrieval;
+using Playkitu.Issuer;
+using Playkitu.Retrieval;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -34,7 +34,7 @@ public sealed class FixtureStore : IReadStore
     }
     public Task<StoredObject?> ReceiptAsync(Guid id, string kind, int sequence, CancellationToken ct) => Task.FromResult(Receipts.GetValueOrDefault($"{kind}:{sequence}"));
     public Task<Stream> ObjectAsync(string key, CancellationToken ct) { ObjectReads++; return Task.FromResult<Stream>(new MemoryStream(Payloads[key], false)); }
-    public Task<string> StreamArnAsync(int slot, CancellationToken ct) => Task.FromResult($"arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-{slot + 1:D2}/1234");
+    public Task<string> StreamArnAsync(int slot, CancellationToken ct) => Task.FromResult($"arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-{slot + 1:D2}/1234");
     public Task<IReadOnlyList<FragmentEntry>> FragmentsAsync(string arn, DateTimeOffset start, DateTimeOffset end, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<FragmentEntry>>(Fragments);
     public async Task<Stream> MediaAsync(string arn, IReadOnlyList<string> fragments, CancellationToken ct)
     {

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using NUnit.Framework;
-using Playreel.Issuer;
+using Playkitu.Issuer;
 
 namespace Issuer.Tests;
 
@@ -24,11 +24,11 @@ public sealed class IssuerTests
         throw new InvalidOperationException();
     }
 
-    [TestCase("00112233-4455-6677-8899-AABBCCDDEEFF", 1792000000L, false, "prrec2:f3xyqizKHT2FlXV-Zk3cwg")]
-    [TestCase("00112233-4455-6677-8899-aabbccddeefe", 1792000000L, false, "prrec2:e4J8ha1le9BPIO12OxzXcw")]
-    [TestCase("00112233-4455-6677-8899-aabbccddeeff", 1792000001L, false, "prrec2:19QsDJxgLDKX3TrjXQX5CQ")]
-    [TestCase("00112233-4455-6677-8899-aabbccddeeff", 1792000000L, true, "prrec2:osLh5KkzgaNs-v92ypKwcw")]
-    [TestCase("00112233-4455-6677-8899-aabbccddeeff", -1L, false, "prrec2:uWd4ib5h-J7M8tfNcf8n6A")]
+    [TestCase("00112233-4455-6677-8899-AABBCCDDEEFF", 1792000000L, false, "pkrec2:MoDgGTKJsg8-sXpYv1YLdg")]
+    [TestCase("00112233-4455-6677-8899-aabbccddeefe", 1792000000L, false, "pkrec2:xFanjOcTcLaHOZ6ISbYldQ")]
+    [TestCase("00112233-4455-6677-8899-aabbccddeeff", 1792000001L, false, "pkrec2:V7Ssr8k_kTCg3-IURFw2Yw")]
+    [TestCase("00112233-4455-6677-8899-aabbccddeeff", 1792000000L, true, "pkrec2:lpuILATZcDnhvwO-_F7gow")]
+    [TestCase("00112233-4455-6677-8899-aabbccddeeff", -1L, false, "pkrec2:ycjMjrXPaTKiu_QaeCnARg")]
     public void CompactIdentityBindsCanonicalTuple(string guid, long seconds, bool otherProof, string expected)
     {
         var before = System.Globalization.CultureInfo.CurrentCulture;
@@ -40,7 +40,7 @@ public sealed class IssuerTests
             Assert.That(Wire.ValidProof(proof), Is.True);
             var identity = Wire.Identity(Guid.Parse(guid), seconds, proof);
             Assert.That(identity, Is.EqualTo(expected));
-            Assert.That(identity, Does.Match("^prrec2:[A-Za-z0-9_-]{22}$"));
+            Assert.That(identity, Does.Match("^pkrec2:[A-Za-z0-9_-]{22}$"));
             Assert.That(Encoding.UTF8.GetByteCount(identity), Is.EqualTo(29));
         } finally { System.Globalization.CultureInfo.CurrentCulture = before; }
     }
@@ -51,7 +51,7 @@ public sealed class IssuerTests
         var response = await new Fixture().Handler.HandleAsync(Event("/v1/config", method: "GET"), null);
         Assert.That(response.StatusCode, Is.EqualTo(200));
         using var body = JsonDocument.Parse(response.Body);
-        Assert.That(body.RootElement.GetProperty("identityPrefix").GetString(), Is.EqualTo("prrec2:"));
+        Assert.That(body.RootElement.GetProperty("identityPrefix").GetString(), Is.EqualTo("pkrec2:"));
         Assert.That(body.RootElement.GetProperty("protocolVersion").GetInt32(), Is.EqualTo(1));
     }
 
@@ -60,18 +60,18 @@ public sealed class IssuerTests
     {
         var id = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"); var proof = new string('A', 43);
         Assert.That(Wire.ValidProof(proof), Is.True);
-        Assert.That(Wire.Identity(id, 1792000000, proof), Is.EqualTo("prrec2:f3xyqizKHT2FlXV-Zk3cwg"));
+        Assert.That(Wire.Identity(id, 1792000000, proof), Is.EqualTo("pkrec2:MoDgGTKJsg8-sXpYv1YLdg"));
         Assert.That(Wire.Identity(id, 1792000000, proof).Length, Is.EqualTo(29));
         Assert.That(Wire.ValidProof(proof[..42] + "B"), Is.False, "Reject alternate noncanonical padding bits.");
     }
 
-    [TestCase(false, false, "baseline", "str:prrec2:f3xyqizKHT2FlXV-Zk3cwg")]
-    [TestCase(true, false, "baseline", "str:prrec2:f3xyqizKHT2FlXV-Zk3cwg")]
-    [TestCase(false, true, "baseline", "str:prrec2:f3xyqizKHT2FlXV-Zk3cwg")]
-    [TestCase(true, true, "baseline", "str:prrec2:f3xyqizKHT2FlXV-Zk3cwg")]
-    [TestCase(false, false, "session", "str:prrec2:e4J8ha1le9BPIO12OxzXcw")]
-    [TestCase(false, false, "time", "str:prrec2:19QsDJxgLDKX3TrjXQX5CQ")]
-    [TestCase(false, false, "proof", "str:prrec2:osLh5KkzgaNs-v92ypKwcw")]
+    [TestCase(false, false, "baseline", "str:pkrec2:MoDgGTKJsg8-sXpYv1YLdg")]
+    [TestCase(true, false, "baseline", "str:pkrec2:MoDgGTKJsg8-sXpYv1YLdg")]
+    [TestCase(false, true, "baseline", "str:pkrec2:MoDgGTKJsg8-sXpYv1YLdg")]
+    [TestCase(true, true, "baseline", "str:pkrec2:MoDgGTKJsg8-sXpYv1YLdg")]
+    [TestCase(false, false, "session", "str:pkrec2:xFanjOcTcLaHOZ6ISbYldQ")]
+    [TestCase(false, false, "time", "str:pkrec2:V7Ssr8k_kTCg3-IURFw2Yw")]
+    [TestCase(false, false, "proof", "str:pkrec2:lpuILATZcDnhvwO-_F7gow")]
     public async Task FixedClientWireRequestPreservesCompleteValveIdentity(bool base64Body, bool alternateJsonSpelling, string bindingCase, string expectedWireIdentity)
     {
         var f = new Fixture(); f.Clock.Utc = DateTimeOffset.FromUnixTimeSeconds(1792000000);
@@ -158,7 +158,7 @@ public sealed class IssuerTests
         Assert.That(f.Db.Control.Slots[0].MaxCredentialExpiry, Is.EqualTo(authorization.Media!.ExpiresAtUtc));
         Assert.That(f.Db.AllStoredText, Does.Not.Contain(start.SessionProof).And.Not.Contain("OFFLINE-MEDIA-SECRET").And.Not.Contain("OFFLINE-PUBLISHER-KEY"));
         Assert.That(f.Valve.Requests, Has.Count.EqualTo(2));
-        Assert.That(f.Valve.Requests[0].Uri, Does.Contain("appid=123456").And.Contain("identity=str%3Aprrec2").And.Not.Contain("OFFLINE-PUBLISHER-KEY"));
+        Assert.That(f.Valve.Requests[0].Uri, Does.Contain("appid=123456").And.Contain("identity=str%3Apkrec2").And.Not.Contain("OFFLINE-PUBLISHER-KEY"));
         Assert.That(f.Valve.Requests.All(x => x.Key == "OFFLINE-PUBLISHER-KEY"), Is.True);
     }
 
@@ -838,6 +838,6 @@ public sealed class IssuerTests
         Assert.DoesNotThrow(request.Validate);
         Assert.That(request.Build.SteamBuildId, Is.Null);
         Assert.That(request.Consent.AcceptedAtUtc.Offset, Is.EqualTo(TimeSpan.Zero));
-        Assert.That(Wire.Identity(request.SessionId, request.AdmissionUnixSeconds, request.SessionProof), Is.EqualTo("prrec2:f3xyqizKHT2FlXV-Zk3cwg"));
+        Assert.That(Wire.Identity(request.SessionId, request.AdmissionUnixSeconds, request.SessionProof), Is.EqualTo("pkrec2:MoDgGTKJsg8-sXpYv1YLdg"));
     }
 }

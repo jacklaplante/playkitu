@@ -1,0 +1,17 @@
+{
+  "name": "Playkitu.Gameplay",
+  "references": [
+    "Playkitu.Client",
+    "Playkitu.Native",
+    "Playkitu.Producer",
+    "Playkitu.Unity",
+    "Unity.Collections"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": false,
+  "allowUnsafeCode": true
+}

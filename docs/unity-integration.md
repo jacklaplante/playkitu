@@ -1,20 +1,20 @@
-# Integrating playreel
+# Integrating playkitu
 
 The package owns capture, microphone acquisition, log upload and bounded retirement. Your game owns consent UI, Steam initialization/callbacks, menus and its connection flow.
 
 ## Install
 
-For local development, use Unity Package Manager's **Add package from disk** and select **packages/com.playreel.recording/package.json** in this checkout. Keep the checkout available while using the file dependency.
+For local development, use Unity Package Manager's **Add package from disk** and select **packages/com.playkitu.recording/package.json** in this checkout. Keep the checkout available while using the file dependency.
 
 For Git installation, use:
 
 ~~~text
-https://github.com/jacklaplante/playreel.git?path=/packages/com.playreel.recording#v0.1.0
+https://github.com/jacklaplante/playkitu.git?path=/packages/com.playkitu.recording#v0.2.0
 ~~~
 
 Pin a reviewed commit or release tag. This source-first package contains no prebuilt runtime; build and bundle the native runtime separately.
 
-If your game uses assembly definitions, put its adapter in a separate assembly referencing **Playreel.Client**, **Playreel.Gameplay** and **Playreel.Unity**. Add **Playreel.Steam** only if using its ticket adapter. Keep ordinary networking functional without the optional adapter/package.
+If your game uses assembly definitions, put its adapter in a separate assembly referencing **Playkitu.Client**, **Playkitu.Gameplay** and **Playkitu.Unity**. Add **Playkitu.Steam** only if using its ticket adapter. Keep ordinary networking functional without the optional adapter/package.
 
 ## Consent and API
 
@@ -23,9 +23,9 @@ Provide a fresh unchecked required checkbox disclosing game-view/game-audio capt
 This sketch uses host-supplied deployment values, consent choices and an existing ticket owner:
 
 ~~~csharp
-using Playreel.Client;
-using Playreel.Gameplay;
-using Playreel.Unity;
+using Playkitu.Client;
+using Playkitu.Gameplay;
+using Playkitu.Unity;
 using UnityEngine;
 
 var trust = new RecordingTrust(
@@ -40,11 +40,11 @@ bool began = recorder.Begin(
     factory, profile, runtimeDirectory, Application.version);
 ~~~
 
-**recorder** is a **PlayreelRecorder** component on an active GameObject. The values, ticket provider and app-ID reader come from your adapter. The package does not discover trust from an API reply.
+**recorder** is a **PlaykituRecorder** component on an active GameObject. The values, ticket provider and app-ID reader come from your adapter. The package does not discover trust from an API reply.
 
 Require consent before Play/join. After required consent is accepted, let gameplay proceed regardless of recording startup success. Contain your adapter/configuration exceptions too; do not wait for tickets, native initialization or upload before releasing the game join.
 
-Trust binds the exact API Gateway HTTPS origin, app, account, region, bucket and stream prefix. Never obtain those trusted values from player input or a response. Identity defaults are **prrec2:** / **playreel-recording:**; explicit compatibility settings must match on client and backend.
+Trust binds the exact API Gateway HTTPS origin, app, account, region, bucket and stream prefix. Never obtain those trusted values from player input or a response. Identity defaults are **pkrec2:** / **playkitu-recording:**; explicit compatibility settings must match on client and backend.
 
 | API | Purpose |
 | --- | --- |
@@ -61,7 +61,7 @@ Wire End, menu return and disconnect to **Stop**; keep the actual menu/game acti
 
 ## Steam ownership
 
-**IRecordingTickets** lets you reuse a working game integration. **SteamRecordingTickets** can wrap a host-owned **SteamWebTicketClient**. The [Steamworks.NET template](../packages/com.playreel.recording/Samples~/SteamworksHost/README.md) shows the callback boundary.
+**IRecordingTickets** lets you reuse a working game integration. **SteamRecordingTickets** can wrap a host-owned **SteamWebTicketClient**. The [Steamworks.NET template](../packages/com.playkitu.recording/Samples~/SteamworksHost/README.md) shows the callback boundary.
 
 Install Steamworks.NET in the host project if using that template. The package does not initialize/shut down Steam or replace the callback pump. Keep tickets out of logs and publisher keys only in the backend secret.
 
@@ -77,10 +77,10 @@ Player inclusion uses **PLAYTEST_RECORDING_ENABLED**. Editor compilation does no
 
 Verify disabled output separately: exclude your adapter, native runtime and recording-only Resources. Hiding a button does not remove build assets.
 
-## Removing playreel
+## Removing playkitu
 
 1. Remove your recording adapter and its dedicated resources. Preserve shared menus, fonts, Steam and ordinary networking.
-2. Remove **com.playreel.recording** from package dependencies and resolve/recompile.
+2. Remove **com.playkitu.recording** from package dependencies and resolve/recompile.
 3. Stop copying native recording files into future builds and inspect actual player output.
 
 The absent adapter must leave ordinary joins functional. Uninstallation does not destroy cloud resources, erase sessions or expire local downloads. Handle those separately using the [infrastructure guide](../infra/README.md).

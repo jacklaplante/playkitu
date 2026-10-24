@@ -1,6 +1,6 @@
 # Source terms and binary release gates
 
-`LICENSE` covers original Playreel engine/tooling code. It does not relicense
+`LICENSE` covers original Playkitu engine/tooling code. It does not relicense
 upstream software, modified AWS source, SDK patches, Microsoft components or
 codecs. `third-party/` preserves the exact upstream license/notice files obtained
 from the hash-pinned source archives in `dependencies.json`:

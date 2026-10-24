@@ -8,7 +8,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecurityToken.Model;
 using NUnit.Framework;
-using Playreel.Issuer;
+using Playkitu.Issuer;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
@@ -25,7 +25,7 @@ public sealed class AdapterTests
         var transport = new RecordingTransport();
         using var sdk = new AmazonDynamoDBClient(new BasicAWSCredentials("OFFLINE", "OFFLINE"), new AmazonDynamoDBConfig
         { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = new RecordingFactory(transport) });
-        var store = new DynamoIssuerStore(sdk, "playreel");
+        var store = new DynamoIssuerStore(sdk, "playkitu");
         Assert.That(await store.GetAsync<SessionState>(DbKey.Session(Guid.NewGuid()), CancellationToken.None), Is.Null);
         Assert.That(await store.CommitAsync([store.Write(new DbKey("OFFLINE"), new { value = 1 }, null)], CancellationToken.None), Is.True);
         Assert.That(transport.Requests, Has.Count.EqualTo(2));

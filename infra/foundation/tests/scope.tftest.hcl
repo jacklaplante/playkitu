@@ -2,7 +2,7 @@ mock_provider "aws" {
   # Model the default configuration's tags so accidentally rebinding the AWS
   # service-linked role to it fails the untagged-role assertion below.
   mock_resource "aws_iam_service_linked_role" {
-    defaults = { tags_all = { Project = "playreel", ManagedBy = "Terraform", Component = "recording" } }
+    defaults = { tags_all = { Project = "playkitu", ManagedBy = "Terraform", Component = "recording" } }
   }
 }
 mock_provider "aws" { alias = "service_linked_role" }
@@ -13,7 +13,7 @@ variables {
 run "empty_named_api_only" {
   command = plan
   assert {
-    condition     = aws_apigatewayv2_api.issuer.name == "playreel-api" && aws_apigatewayv2_api.issuer.protocol_type == "HTTP" && length(aws_iam_service_linked_role.api_gateway) == 0
+    condition     = aws_apigatewayv2_api.issuer.name == "playkitu-api" && aws_apigatewayv2_api.issuer.protocol_type == "HTTP" && length(aws_iam_service_linked_role.api_gateway) == 0
     error_message = "Foundation must create only the empty named API by default."
   }
 }

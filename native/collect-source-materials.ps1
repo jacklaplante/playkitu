@@ -16,8 +16,8 @@ foreach($item in Get-ChildItem $PSScriptRoot){if($item.Name -notin $ignored){Cop
 foreach($name in @('bin','obj')){$target=[IO.Path]::GetFullPath("$Output/native/tests/ManagedBoundary/$name");$prefix=$Output+[IO.Path]::DirectorySeparatorChar;if(!$target.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe source-material cleanup'};if(Test-Path $target){Remove-Item -LiteralPath $target -Recurse}}
 foreach($entry in $archives){Copy-Item "$Private/downloads/$($entry.file)" "$Output/upstream"}
 foreach($folder in @('Client','Native','Producer')){
- $target="$Output/packages/com.playreel.recording/$folder";New-Item -ItemType Directory $target -Force | Out-Null
- Get-ChildItem "$PSScriptRoot/../packages/com.playreel.recording/$folder" -File | Where-Object Extension -eq '.cs' | Copy-Item -Destination $target
+ $target="$Output/packages/com.playkitu.recording/$folder";New-Item -ItemType Directory $target -Force | Out-Null
+ Get-ChildItem "$PSScriptRoot/../packages/com.playkitu.recording/$folder" -File | Where-Object Extension -eq '.cs' | Copy-Item -Destination $target
 }
 @{binaryReleaseApproved=$false;missing='Exact GStreamer/dependency corresponding sources, build recipes and binary redistribution/security gates in REDISTRIBUTION.md';archives=$archives} | ConvertTo-Json -Depth 5 | Set-Content "$Output/materials.json"
 Get-ChildItem $Output -File -Recurse | ForEach-Object {@{path=$_.FullName.Substring($Output.Length+1).Replace('\','/');sha256=(Get-FileHash $_.FullName).Hash}} | ConvertTo-Json | Set-Content "$Output/inventory.json"

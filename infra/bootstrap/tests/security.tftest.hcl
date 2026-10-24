@@ -1,10 +1,10 @@
 mock_provider "aws" {
   mock_resource "aws_cloudwatch_event_rule" {
-    defaults = { arn = "arn:aws:events:us-east-2:123456789012:rule/playreel-daily-cleanup" }
+    defaults = { arn = "arn:aws:events:us-east-2:123456789012:rule/playkitu-daily-cleanup" }
   }
 
   mock_resource "aws_iam_role" {
-    defaults = { arn = "arn:aws:iam::123456789012:role/playreel/playreel-issuer" }
+    defaults = { arn = "arn:aws:iam::123456789012:role/playkitu/playkitu-issuer" }
   }
   mock_resource "aws_apigatewayv2_api" {
     defaults = {
@@ -14,10 +14,10 @@ mock_provider "aws" {
     }
   }
   mock_resource "aws_cloudwatch_log_group" {
-    defaults = { arn = "arn:aws:logs:us-east-2:123456789012:log-group:/playreel/api-access" }
+    defaults = { arn = "arn:aws:logs:us-east-2:123456789012:log-group:/playkitu/api-access" }
   }
   mock_resource "aws_sns_topic" {
-    defaults = { arn = "arn:aws:sns:us-east-2:123456789012:playreel-alerts" }
+    defaults = { arn = "arn:aws:sns:us-east-2:123456789012:playkitu-alerts" }
   }
 }
 variables {
@@ -69,7 +69,7 @@ run "owner_storage_and_boundaries" {
     error_message = "First bootstrap must not activate invocation before runtime exists."
   }
   assert {
-    condition     = aws_cloudwatch_log_group.lambda.retention_in_days == 30 && aws_cloudwatch_log_group.access.retention_in_days == 30 && aws_sns_topic_subscription.email.endpoint == "alerts@example.invalid" && length(aws_cloudwatch_metric_alarm.lambda) == 2 && length(aws_budgets_budget.project.notification) == 4 && one(one(aws_budgets_budget.project.cost_filter).values) == "user:Project$playreel"
+    condition     = aws_cloudwatch_log_group.lambda.retention_in_days == 30 && aws_cloudwatch_log_group.access.retention_in_days == 30 && aws_sns_topic_subscription.email.endpoint == "alerts@example.invalid" && length(aws_cloudwatch_metric_alarm.lambda) == 2 && length(aws_budgets_budget.project.notification) == 4 && one(one(aws_budgets_budget.project.cost_filter).values) == "user:Project$playkitu"
     error_message = "Operational retention/alert destination/budget filter changed."
   }
   assert {

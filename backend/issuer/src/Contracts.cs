@@ -4,9 +4,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Playreel.Client;
+using Playkitu.Client;
 
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 // Recording admission diagnostics are closed categories, never Valve response text.
 public enum SteamAuthFailure { MissingResponse, ValveError, MissingParams, ResultNotOk, MissingSteamId }
@@ -59,12 +59,12 @@ public static class Wire
     };
     public static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     public static string Identity(Guid sessionId, long unixSeconds, string proof) =>
-        Playreel.Client.RecordingIdentity.Identity(sessionId, unixSeconds, proof);
+        Playkitu.Client.RecordingIdentity.Identity(sessionId, unixSeconds, proof);
     public static void Require([DoesNotReturnIf(false)] bool condition, string code = "invalid_request")
     { if (!condition) throw new IssuerError(400, code); }
     // Preserve the existing issuer API while compiling the same portable canonical
     // identity/proof source as Unity. This does not replace the deployed ZIP.
-    public static bool ValidProof(string? value) => value is not null && Playreel.Client.RecordingIdentity.ValidProof(value);
+    public static bool ValidProof(string? value) => value is not null && Playkitu.Client.RecordingIdentity.ValidProof(value);
     public static bool SameProof(string proof, string expectedHash) =>
         CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(Hash(proof)), Encoding.ASCII.GetBytes(expectedHash));
 }

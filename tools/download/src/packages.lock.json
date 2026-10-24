@@ -76,7 +76,7 @@
           "AWSSDK.Core": "[4.0.102.11, 5.0.0)"
         }
       },
-      "Playreel.Issuer": {
+      "Playkitu.Issuer": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.11, )",

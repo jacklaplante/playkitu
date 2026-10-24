@@ -1,0 +1,5 @@
+{
+  "name": "Playkitu.Sample.Editor",
+  "references": [],
+  "includePlatforms": ["Editor"]
+}

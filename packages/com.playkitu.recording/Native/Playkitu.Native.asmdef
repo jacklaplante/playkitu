@@ -1,0 +1,13 @@
+{
+  "name": "Playkitu.Native",
+  "references": [
+    "Playkitu.Client"
+  ],
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": true,
+  "allowUnsafeCode": false
+}

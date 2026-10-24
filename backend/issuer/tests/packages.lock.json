@@ -159,7 +159,7 @@
           "Microsoft.TestPlatform.ObjectModel": "18.11.0"
         }
       },
-      "Playreel.Issuer": {
+      "Playkitu.Issuer": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.11, )",

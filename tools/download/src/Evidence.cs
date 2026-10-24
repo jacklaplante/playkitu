@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Playreel.Client;
+using Playkitu.Client;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed record LogRange(int Sequence, long ByteStart, long ByteLength, long StartNs, long EndNs);
 public sealed record LogGap(long? AcceptedByteOffset, ulong Bytes, int? Sequence, string Reason);

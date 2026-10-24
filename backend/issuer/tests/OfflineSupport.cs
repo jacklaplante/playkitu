@@ -10,7 +10,7 @@ using Amazon.SecurityToken.Model;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Playreel.Issuer;
+using Playkitu.Issuer;
 
 namespace Issuer.Tests;
 
@@ -43,7 +43,7 @@ public sealed class MemoryDynamo : AmazonDynamoDBClient
     public Action<TransactWriteItemsRequest>? BeforeCommit;
     public MemoryDynamo() : base(new BasicAWSCredentials("OFFLINE", "OFFLINE"), new AmazonDynamoDBConfig { RegionEndpoint = RegionEndpoint.USEast2, HttpClientFactory = new BlockedFactory() })
     {
-        var put = new DynamoIssuerStore(this, "playreel").Write(DbKey.Control, new GlobalState(), null);
+        var put = new DynamoIssuerStore(this, "playkitu").Write(DbKey.Control, new GlobalState(), null);
         put.Item["admissionsEnabled"] = new() { BOOL = true }; put.Item["uploadsEnabled"] = new() { BOOL = true };
         rows[("CONTROL", "META")] = Clone(put.Item);
     }
@@ -161,7 +161,7 @@ public sealed class Fixture
     public DynamoIssuerStore Store;
     public IssuerService Service;
     public Function Handler;
-    public IssuerOptions Options = Playreel.Tests.DeploymentFixture.Create();
+    public IssuerOptions Options = Playkitu.Tests.DeploymentFixture.Create();
     public Fixture(IssuerOptions? options = null)
     {
         if (options is not null) Options = options;

@@ -1,4 +1,4 @@
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 public sealed class GlobalState
 {
@@ -77,12 +77,12 @@ public sealed class SessionState
     public DateTimeOffset? EndsAt { get; set; }
     public int MetadataFinalizationSeconds { get; set; }
     [System.Text.Json.Serialization.JsonIgnore]
-    public DateTimeOffset? MetadataUntilUtc => MetadataFinalizationSeconds == Playreel.Client.RecordingDiagnosticsLimits.MetadataFinalizationSeconds
+    public DateTimeOffset? MetadataUntilUtc => MetadataFinalizationSeconds == Playkitu.Client.RecordingDiagnosticsLimits.MetadataFinalizationSeconds
         ? EndsAt?.AddSeconds(MetadataFinalizationSeconds) : null;
     [System.Text.Json.Serialization.JsonIgnore]
-    public long DiagnosticByteLimit => MetadataFinalizationSeconds == 0 ? IssuerOptions.MaxBytes : Playreel.Client.RecordingDiagnosticsLimits.StoredBytesPerSession;
+    public long DiagnosticByteLimit => MetadataFinalizationSeconds == 0 ? IssuerOptions.MaxBytes : Playkitu.Client.RecordingDiagnosticsLimits.StoredBytesPerSession;
     [System.Text.Json.Serialization.JsonIgnore]
-    public int DiagnosticObjectLimit => MetadataFinalizationSeconds == 0 ? 4096 : Playreel.Client.RecordingDiagnosticsLimits.ObjectsPerSession;
+    public int DiagnosticObjectLimit => MetadataFinalizationSeconds == 0 ? 4096 : Playkitu.Client.RecordingDiagnosticsLimits.ObjectsPerSession;
     public DateTimeOffset? LastMediaIssued { get; set; }
     public DateTimeOffset? LastMediaAttempt { get; set; }
     public long PurgeAt { get; set; }

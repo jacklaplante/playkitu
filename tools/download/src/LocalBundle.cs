@@ -1,8 +1,8 @@
-using Playreel.Issuer;
+using Playkitu.Issuer;
 using System.Globalization;
 using System.Text.Json;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed class MappingResult
 {

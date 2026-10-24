@@ -3,7 +3,7 @@ using Amazon.DynamoDBv2.Model;
 using System.Globalization;
 using System.Text.Json;
 
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 public sealed class UnknownCommitException : Exception;
 

@@ -38,8 +38,8 @@ Close this sample's Editor. Choose fresh absolute output:
 $output = Join-Path $PWD '.artifacts/my-native-check'
 pwsh -NoProfile -File samples/MinimalUnity/build-native-self-check.ps1 -Output $output
 . ./native/common.ps1
-$result = Invoke-BoundedProcess "$output/player/PlayreelSample.exe" @(
-    '-batchmode', '-nographics', '--playreel-native-self-check',
+$result = Invoke-BoundedProcess "$output/player/PlaykituSample.exe" @(
+    '-batchmode', '-nographics', '--playkitu-native-self-check',
     '-logFile', "$output/self-check-player.log"
 ) $PWD.Path "$output/self-check-process.log" 60 @{} -MinimalEnvironment
 if ($result.ExitCode -ne 0) { throw 'Native self-check failed' }

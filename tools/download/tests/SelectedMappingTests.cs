@@ -1,6 +1,6 @@
 using NUnit.Framework;
-using Playreel.Retrieval;
-using Playreel.Issuer;
+using Playkitu.Retrieval;
+using Playkitu.Issuer;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -161,7 +161,7 @@ public sealed class SelectedMappingTests
             + "Set-Content -LiteralPath " + Quote(Path.Combine(runtime,"used")) + " -Value 'explicit'\n"
             + "Copy-Item -LiteralPath " + Quote(selected) + " -Destination $Output\nexit 0\n";
         await File.WriteAllTextAsync(Path.Combine(tools, "probe-media.ps1"), script);
-        var code = await Playreel.Retrieval.Program.Main(["locate-log", "--directory", run.Directory,
+        var code = await Playkitu.Retrieval.Program.Main(["locate-log", "--directory", run.Directory,
             "--log-file", "logs-0000.log", "--line", "2", "--output", Path.Combine(root,"override-result"),
             "--tool-root", tools, "--native-runtime", runtime]);
         Assert.That(code, Is.Zero); Assert.That(File.Exists(Path.Combine(runtime,"used")), Is.True);
@@ -174,7 +174,7 @@ public sealed class SelectedMappingTests
         foreach (var command in new[] { "inspect", "map", "metadata" }) {
             var original = Console.Out; using var output = new StringWriter();
             int code;
-            try { Console.SetOut(output); code = await Playreel.Retrieval.Program.Main([command,"--native-runtime",runtime]); }
+            try { Console.SetOut(output); code = await Playkitu.Retrieval.Program.Main([command,"--native-runtime",runtime]); }
             finally { Console.SetOut(original); }
             Assert.That(code, Is.EqualTo(2)); Assert.That(output.ToString(), Does.Contain("invalid_native_runtime"));
         }
@@ -264,7 +264,7 @@ public sealed class SelectedMappingTests
         // Reuse the existing exact, outward-rounded relative-clock arithmetic.
         // Both operands are explicitly in the same managed counter domain here;
         // no assumption that managed ticks equal native QPC is introduced.
-        Assert.That(Playreel.Client.RecordingSchedulingMath.TryInterval(0, 100,
+        Assert.That(Playkitu.Client.RecordingSchedulingMath.TryInterval(0, 100,
             bridgeTicks, callbackFrequency, ticks, 0, out long low, out long high), Is.True);
         Assert.That(low, Is.GreaterThanOrEqualTo(point.BeforeNs)); Assert.That(high, Is.LessThanOrEqualTo(point.AfterNs));
         Assert.That(points.Count(p => low <= p.AfterNs && high >= p.BeforeNs), Is.EqualTo(1));
@@ -296,7 +296,7 @@ public sealed class SelectedMappingTests
             Assert.That(run.Mapping.ConstructionSourceSha256, Has.Length.EqualTo(2)); Assert.That(run.Mapping.SameRunLiveProofVerified, Is.False);
             Assert.That(run.Mapping.PlaybackOffsetVerified, Is.False); Assert.That(run.Mapping.Coverage, Is.EqualTo("unverified"));
             Assert.That(probe.Targets, Has.Count.EqualTo(3)); });
-        Assert.That(await Playreel.Retrieval.Program.Main(["map", "--directory", run.Directory, "--elapsed-ns", (point.BeforeNs + (point.AfterNs - point.BeforeNs) / 2).ToString(CultureInfo.InvariantCulture)]), Is.Zero);
+        Assert.That(await Playkitu.Retrieval.Program.Main(["map", "--directory", run.Directory, "--elapsed-ns", (point.BeforeNs + (point.AfterNs - point.BeforeNs) / 2).ToString(CultureInfo.InvariantCulture)]), Is.Zero);
         var json = JsonSerializer.SerializeToElement(run.Mapping.SelectedPoint, Wire.Json);
         Assert.That(json.GetProperty("decoded").GetProperty("bufferOrdinal").GetString(), Is.EqualTo("61"));
         Assert.That(json.GetProperty("managedEnclosureNs").GetString(), Is.EqualTo("100"));

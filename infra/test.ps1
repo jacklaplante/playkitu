@@ -1,5 +1,5 @@
 $ErrorActionPreference='Stop'
-$tf=if($env:PLAYREEL_TERRAFORM){[IO.Path]::GetFullPath($env:PLAYREEL_TERRAFORM)}else{Join-Path $PSScriptRoot 'private/terraform/terraform.exe'}
+$tf=if($env:PLAYKITU_TERRAFORM){[IO.Path]::GetFullPath($env:PLAYKITU_TERRAFORM)}else{Join-Path $PSScriptRoot 'private/terraform/terraform.exe'}
 if(!(Test-Path $tf)){throw 'Run infra/prepare.ps1 or select the pinned Terraform executable.'}
 if((& $tf version -json | ConvertFrom-Json).terraform_version -ne '1.16.6'){throw 'Pinned Terraform 1.16.6 required.'}
 $evidence=Join-Path $PSScriptRoot 'private/tests'

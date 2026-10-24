@@ -1,6 +1,6 @@
 # Native recording engine
 
-Windows x64 source and local development tooling for Playreel. It builds the
+Windows x64 source and local development tooling for Playkitu. It builds the
 in-process recording DLL, patched AWS Kinesis `kvssink` plugin, bounded decoded
 media probe and offline tests. No Unity project, game assets, Steam installation,
 account credentials or old dependency cache is needed to compile it.

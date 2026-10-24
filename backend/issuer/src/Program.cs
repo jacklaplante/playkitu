@@ -1,5 +1,5 @@
 using System.Text.Json;
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 public static class Program
 {

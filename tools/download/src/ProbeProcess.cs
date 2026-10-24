@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed class ProbeProcess(string toolRoot, string? nativeRuntime = null) : IMediaProbe
 {

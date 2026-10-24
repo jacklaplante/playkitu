@@ -1,9 +1,9 @@
 using System.IO.Compression;
 using System.Text.Json;
 using NUnit.Framework;
-using Playreel.Tests;
-using Playreel.Issuer;
-using Playreel.Retrieval;
+using Playkitu.Tests;
+using Playkitu.Issuer;
+using Playkitu.Retrieval;
 
 namespace Retrieval.Tests;
 
@@ -28,7 +28,7 @@ public sealed class FourHourCatalogTests
         }
         public Task<StoredObject?> ReceiptAsync(Guid id, string kind, int sequence, CancellationToken ct) => Task.FromResult(receipts.SingleOrDefault(o => o.Descriptor.Kind == kind && o.Descriptor.Sequence == sequence));
         public Task<Stream> ObjectAsync(string key, CancellationToken ct) => Task.FromResult<Stream>(File.OpenRead(GeneratedDiagnosticsFixture.FilePath(export.Objects.Single(o => o.Key == key))));
-        public Task<string> StreamArnAsync(int slot, CancellationToken ct) => Task.FromResult("arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-01/1234");
+        public Task<string> StreamArnAsync(int slot, CancellationToken ct) => Task.FromResult("arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-01/1234");
         public Task<IReadOnlyList<FragmentEntry>> FragmentsAsync(string arn, DateTimeOffset start, DateTimeOffset end, int limit, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<FragmentEntry>>(Persisted.Where(f => f.ProducerUtc >= start && f.ProducerUtc < end).ToArray());
         public Task<Stream> MediaAsync(string arn, IReadOnlyList<string> fragments, CancellationToken ct) { MediaReads++; return Task.FromResult<Stream>(new MemoryStream([1, 2, 3, 4])); }

@@ -1,7 +1,7 @@
 # Definitions only. Sourcing this file never authenticates, reads or changes AWS.
 . "$PSScriptRoot/../config.ps1"
 
-function Assert-PlayreelRole([string]$ConfigurationFile,[string]$Profile,[ValidateSet('deploy','operations','retrieval')][string]$Role) {
+function Assert-PlaykituRole([string]$ConfigurationFile,[string]$Profile,[ValidateSet('deploy','operations','retrieval')][string]$Role) {
     $c=Read-InfrastructureConfiguration $ConfigurationFile
     foreach($key in 'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_SESSION_TOKEN','AWS_ENDPOINT_URL'){
         if([Environment]::GetEnvironmentVariable($key)){throw 'Use isolated explicit process profiles; ambient credentials/endpoints are forbidden.'}
@@ -19,11 +19,11 @@ function Assert-PlayreelRole([string]$ConfigurationFile,[string]$Profile,[Valida
     if($i.account -cne $c.account -or $i.arn -cnotmatch ('\Aarn:aws:sts::'+[regex]::Escape($c.account)+':assumed-role/'+[regex]::Escape("$($c.project)-$Role")+'/[A-Za-z0-9_+=,.@-]+\z')){throw 'Wrong owner account or role.'}
 }
 
-function Set-PlayreelControls {
+function Set-PlaykituControls {
     param([Parameter(Mandatory)][string]$ConfigurationFile,[Parameter(Mandatory)][string]$Profile,
         [Parameter(Mandatory)][string]$Request,[Parameter(Mandatory)][string]$ReadRequest,
         [Parameter(Mandatory)][bool]$AdmissionsEnabled,[Parameter(Mandatory)][bool]$UploadsEnabled)
-    Assert-PlayreelRole $ConfigurationFile $Profile operations
+    Assert-PlaykituRole $ConfigurationFile $Profile operations
     $c=Read-InfrastructureConfiguration $ConfigurationFile
     $change=Get-Content $Request -Raw | ConvertFrom-Json -AsHashtable -DateKind String
     $read=Get-Content $ReadRequest -Raw | ConvertFrom-Json -AsHashtable -DateKind String
@@ -40,12 +40,12 @@ function Set-PlayreelControls {
     $v
 }
 
-function Get-PlayreelAllowance {
+function Get-PlaykituAllowance {
     param([Parameter(Mandatory)][string]$ConfigurationFile,[Parameter(Mandatory)][string]$OperationsProfile,
         [Parameter(Mandatory)][string]$DeployProfile,[Parameter(Mandatory)][ValidateRange(1,8)][int]$PlannedAdmissions,
         [Parameter(Mandatory)][ValidatePattern('\A[a-fA-F0-9]{64}\z')][string]$ReviewedIssuerSha256)
-    Assert-PlayreelRole $ConfigurationFile $OperationsProfile operations
-    Assert-PlayreelRole $ConfigurationFile $DeployProfile deploy
+    Assert-PlaykituRole $ConfigurationFile $OperationsProfile operations
+    Assert-PlaykituRole $ConfigurationFile $DeployProfile deploy
     $c=Read-InfrastructureConfiguration $ConfigurationFile
     $code=& aws lambda get-function-configuration --function-name $c.function --profile $DeployProfile --region $c.region --query CodeSha256 --output text --cli-connect-timeout 5 --cli-read-timeout 10
     if($LASTEXITCODE){throw 'Reviewed issuer hash unavailable.'}

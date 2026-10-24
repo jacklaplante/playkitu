@@ -1,7 +1,7 @@
 using Amazon.DynamoDBv2.Model;
 using System.Diagnostics;
 
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 // identity is the AuthenticateUserTicket wire representation. Recording wraps its
 // session-bound SDK generic string with str: before verification below.
@@ -94,7 +94,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         // SAME prrec2 ticket rejects the raw value (105) and accepts this explicit
         // type prefix. Keep the SDK per-session/time/proof identity unchanged; never
         // retry a raw/omitted/shared identity.
-        try { steamId = await valve.VerifyAsync(request.SteamTicketHex, "str:" + Playreel.Client.RecordingIdentity.Identity(request.SessionId, request.AdmissionUnixSeconds, request.SessionProof, options.IdentityPrefix, options.IdentityDomain), ct); }
+        try { steamId = await valve.VerifyAsync(request.SteamTicketHex, "str:" + Playkitu.Client.RecordingIdentity.Identity(request.SessionId, request.AdmissionUnixSeconds, request.SessionProof, options.IdentityPrefix, options.IdentityDomain), ct); }
         catch (IssuerError error)
         {
             await ReleaseClaimAsync(claim, error.Status == 403, ct);

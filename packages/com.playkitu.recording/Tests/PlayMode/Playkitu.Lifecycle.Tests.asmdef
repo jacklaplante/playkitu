@@ -1,0 +1,8 @@
+{
+  "name": "Playkitu.Lifecycle.Tests",
+  "references": ["Playkitu.Client", "Playkitu.Native", "Playkitu.Producer", "Playkitu.Gameplay", "Unity.Newtonsoft.Json"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "overrideReferences": true,
+  "precompiledReferences": ["Newtonsoft.Json.dll"],
+  "autoReferenced": false
+}

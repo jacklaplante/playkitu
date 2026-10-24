@@ -6,8 +6,8 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.SecurityToken;
 using NUnit.Framework;
-using Playreel.Issuer;
-using Playreel.Retrieval;
+using Playkitu.Issuer;
+using Playkitu.Retrieval;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -48,7 +48,7 @@ public sealed class AwsAdapterTests
         using var d = new AmazonDynamoDBClient(Fake, RegionEndpoint.USEast2);
         using var s = new AmazonS3Client(Fake, new AmazonS3Config { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
         using var v = new AmazonKinesisVideoClient(Fake, RegionEndpoint.USEast2);
-        var store = new AwsReadStore(d, s, v, _ => throw new AssertionException("unexpected archive factory"), Playreel.Tests.DeploymentFixture.Create());
+        var store = new AwsReadStore(d, s, v, _ => throw new AssertionException("unexpected archive factory"), Playkitu.Tests.DeploymentFixture.Create());
         if (repeatedToken) Assert.That(async () => await store.ObjectsPageAsync(prefix, 256, "previous", default), Throws.TypeOf<RetrievalError>());
         else Assert.That((await store.ObjectsPageAsync(prefix, 256, "previous", default)).NextToken, Is.EqualTo("next"));
         Assert.That(http.Requests, Has.Count.EqualTo(1));
@@ -74,7 +74,7 @@ public sealed class AwsAdapterTests
         using var dynamo = new AmazonDynamoDBClient(Fake, new AmazonDynamoDBConfig { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
         using var s3 = new AmazonS3Client(Fake, new AmazonS3Config { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
         using var video = new AmazonKinesisVideoClient(Fake, new AmazonKinesisVideoConfig { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
-        var store = new AwsReadStore(dynamo, s3, video, _ => throw new AssertionException("unexpected archive factory"), Playreel.Tests.DeploymentFixture.Create());
+        var store = new AwsReadStore(dynamo, s3, video, _ => throw new AssertionException("unexpected archive factory"), Playkitu.Tests.DeploymentFixture.Create());
         Assert.That(await store.ListSessionsAsync(new(2026, 10, 15), 20, CancellationToken.None), Is.EqualTo(new[] { FixtureStore.Id }));
         Assert.That(await store.SessionAsync(FixtureStore.Id, CancellationToken.None), Is.Not.Null);
         await store.ReceiptAsync(FixtureStore.Id, "log", 12, CancellationToken.None);
@@ -100,14 +100,14 @@ public sealed class AwsAdapterTests
         using var dynamo = new AmazonDynamoDBClient(Fake, RegionEndpoint.USEast2);
         using var s3 = new AmazonS3Client(Fake, new AmazonS3Config { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
         using var video = new AmazonKinesisVideoClient(Fake, RegionEndpoint.USEast2);
-        var store = new AwsReadStore(dynamo, s3, video, _ => throw new AssertionException("unexpected archive factory"), Playreel.Tests.DeploymentFixture.Create());
+        var store = new AwsReadStore(dynamo, s3, video, _ => throw new AssertionException("unexpected archive factory"), Playkitu.Tests.DeploymentFixture.Create());
         var items = await store.ObjectsAsync(prefix, 2, CancellationToken.None); Assert.That(items.Single().Bytes, Is.EqualTo(3));
         await using var stream = await store.ObjectAsync(items.Single().Key, CancellationToken.None); using var output = new MemoryStream(); await stream.CopyToAsync(output);
         Assert.That(output.ToArray(), Is.EqualTo(new byte[] { 1, 2, 3 })); Assert.That(calls, Is.EqualTo(2));
     }
     [Test] public async Task RealKvsMarshallerUsesProducerSelectorAndExplicitOpaqueFragmentList()
     {
-        var arn = "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-01/1234";
+        var arn = "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-01/1234";
         var bodyLog = new List<JsonElement>();
         var http = new FakeHttpFactory(async request => {
             using var doc = JsonDocument.Parse(await request.Content!.ReadAsStringAsync()); bodyLog.Add(doc.RootElement.Clone());
@@ -122,7 +122,7 @@ public sealed class AwsAdapterTests
         using var d = new AmazonDynamoDBClient(Fake, RegionEndpoint.USEast2); using var s = new AmazonS3Client(Fake, RegionEndpoint.USEast2);
         using var v = new AmazonKinesisVideoClient(Fake, new AmazonKinesisVideoConfig { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
         var store = new AwsReadStore(d, s, v, endpoint => new AmazonKinesisVideoArchivedMediaClient(Fake,
-            new AmazonKinesisVideoArchivedMediaConfig { ServiceURL = endpoint, AuthenticationRegion = "us-east-2", MaxErrorRetry = 0, HttpClientFactory = http }), Playreel.Tests.DeploymentFixture.Create());
+            new AmazonKinesisVideoArchivedMediaConfig { ServiceURL = endpoint, AuthenticationRegion = "us-east-2", MaxErrorRetry = 0, HttpClientFactory = http }), Playkitu.Tests.DeploymentFixture.Create());
         Assert.That(await store.StreamArnAsync(0, CancellationToken.None), Is.EqualTo(arn));
         var fragments = await store.FragmentsAsync(arn, TimingEvidence.Unix(FixtureStore.First), TimingEvidence.Unix(FixtureStore.First + 10000000), 10, CancellationToken.None);
         Assert.That(fragments.Single().ProducerUtc.ToUnixTimeSeconds(), Is.EqualTo(1792070247));
@@ -130,15 +130,15 @@ public sealed class AwsAdapterTests
         Assert.That(bodyLog.Single(b => b.TryGetProperty("FragmentSelector", out _)).GetProperty("FragmentSelector").GetProperty("FragmentSelectorType").GetString(), Is.EqualTo("PRODUCER_TIMESTAMP"));
         Assert.That(bodyLog.Single(b => b.TryGetProperty("Fragments", out _)).GetProperty("Fragments")[0].GetString(), Is.EqualTo("opaque-fragment"));
     }
-    [TestCase("123456789012", "playreel-retrieval", true)]
-    [TestCase("000000000000", "playreel-retrieval", false)]
-    [TestCase("123456789012", "playreel-deploy", false)]
+    [TestCase("123456789012", "playkitu-retrieval", true)]
+    [TestCase("000000000000", "playkitu-retrieval", false)]
+    [TestCase("123456789012", "playkitu-deploy", false)]
     public async Task StsIdentityGuardChecksActualReturnedAccountAndRole(string account, string role, bool expected)
     {
         var http = new FakeHttpFactory(_ => Task.FromResult(FakeHttpFactory.Xml($"<GetCallerIdentityResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\"><GetCallerIdentityResult><Account>{account}</Account><Arn>arn:aws:sts::{account}:assumed-role/{role}/offline-fixture</Arn><UserId>fake</UserId></GetCallerIdentityResult><ResponseMetadata><RequestId>fake</RequestId></ResponseMetadata></GetCallerIdentityResponse>")));
         using var sts = new AmazonSecurityTokenServiceClient(Fake, new AmazonSecurityTokenServiceConfig { RegionEndpoint = RegionEndpoint.USEast2, MaxErrorRetry = 0, HttpClientFactory = http });
-        if (expected) await OwnerProfile.VerifyAsync(sts, Playreel.Tests.DeploymentFixture.Create(), CancellationToken.None);
-        else Assert.That(async () => await OwnerProfile.VerifyAsync(sts, Playreel.Tests.DeploymentFixture.Create(), CancellationToken.None), Throws.TypeOf<RetrievalError>().With.Message.EqualTo("wrong_owner_identity"));
+        if (expected) await OwnerProfile.VerifyAsync(sts, Playkitu.Tests.DeploymentFixture.Create(), CancellationToken.None);
+        else Assert.That(async () => await OwnerProfile.VerifyAsync(sts, Playkitu.Tests.DeploymentFixture.Create(), CancellationToken.None), Throws.TypeOf<RetrievalError>().With.Message.EqualTo("wrong_owner_identity"));
     }
     [Test] public void NamedProfileLoaderConstructsOnlyAnExplicitFakeProcessProvider()
     {

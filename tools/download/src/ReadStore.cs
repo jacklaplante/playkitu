@@ -1,6 +1,6 @@
-using Playreel.Issuer;
+using Playkitu.Issuer;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed class RetrievalError(string code) : Exception(code)
 {

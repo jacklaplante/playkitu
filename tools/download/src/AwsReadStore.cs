@@ -11,9 +11,9 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.SecurityToken;
 using Amazon.SecurityToken.Model;
-using Playreel.Issuer;
+using Playkitu.Issuer;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed class AwsReadStore(IAmazonDynamoDB dynamo, IAmazonS3 s3, IAmazonKinesisVideo video,
     Func<string, IAmazonKinesisVideoArchivedMedia> archive, Deployment deployment) : IReadStore

@@ -4,11 +4,11 @@ using Amazon.KinesisVideo;
 using Amazon.KinesisVideoArchivedMedia;
 using Amazon.S3;
 using Amazon.SecurityToken;
-using Playreel.Issuer;
+using Playkitu.Issuer;
 using System.Globalization;
 using System.Text.Json;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public static class Program
 {

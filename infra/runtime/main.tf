@@ -75,7 +75,7 @@ resource "aws_lambda_function" "issuer" {
   role                           = var.issuer_role_arn
   runtime                        = "dotnet10"
   architectures                  = ["x86_64"]
-  handler                        = "Playreel.Issuer::Playreel.Issuer.Function::HandleAsync"
+  handler                        = "Playkitu.Issuer::Playkitu.Issuer.Function::HandleAsync"
   filename                       = var.issuer_zip
   source_code_hash               = filebase64sha256(var.issuer_zip)
   memory_size                    = 256
@@ -84,7 +84,7 @@ resource "aws_lambda_function" "issuer" {
   ephemeral_storage { size = 512 }
   environment {
     variables = {
-      PLAYREEL_DEPLOYMENT = jsonencode({
+      PLAYKITU_DEPLOYMENT = jsonencode({
         awsAccountId       = local.c.account
         awsRegion          = local.c.region
         steamAppId         = local.c.steam_app_id
@@ -142,4 +142,4 @@ variable "expected_issuer_sha256" {
     error_message = "Explicit reviewed SHA256 required."
   }
 }
-output "download_configuration" { value = jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYREEL_DEPLOYMENT) }
+output "download_configuration" { value = jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT) }

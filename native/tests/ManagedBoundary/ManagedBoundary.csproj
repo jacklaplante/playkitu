@@ -2,9 +2,9 @@
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net6.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="../../../packages/com.playreel.recording/Client/*.cs" />
-    <Compile Include="../../../packages/com.playreel.recording/Native/*.cs" />
-    <Compile Include="../../../packages/com.playreel.recording/Producer/*.cs" />
+    <Compile Include="../../../packages/com.playkitu.recording/Client/*.cs" />
+    <Compile Include="../../../packages/com.playkitu.recording/Native/*.cs" />
+    <Compile Include="../../../packages/com.playkitu.recording/Producer/*.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>

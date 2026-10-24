@@ -175,7 +175,7 @@
           "Microsoft.TestPlatform.ObjectModel": "18.11.0"
         }
       },
-      "Playreel.Issuer": {
+      "Playkitu.Issuer": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.11, )",
@@ -188,13 +188,13 @@
           "Amazon.Lambda.Serialization.SystemTextJson": "[3.0.1, )"
         }
       },
-      "Playreel.Retrieval": {
+      "Playkitu.Retrieval": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.Core": "[4.0.102.11, 4.0.102.11]",
           "AWSSDK.KinesisVideo": "[4.0.100.19, 4.0.100.19]",
           "AWSSDK.KinesisVideoArchivedMedia": "[4.0.100.19, 4.0.100.19]",
-          "Playreel.Issuer": "[1.0.0, )"
+          "Playkitu.Issuer": "[1.0.0, )"
         }
       }
     }

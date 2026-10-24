@@ -6,7 +6,7 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-namespace Playreel.Sample.Editor
+namespace Playkitu.Sample.Editor
 {
     public static class NativeSampleBuild
     {
@@ -17,19 +17,19 @@ namespace Playreel.Sample.Editor
             public int errors;
         }
 
-        // Batchmode: -executeMethod Playreel.Sample.Editor.NativeSampleBuild.Build
-        // -playreelOutput <fresh absolute path> -playreelRuntime <absolute runtime>.
+        // Batchmode: -executeMethod Playkitu.Sample.Editor.NativeSampleBuild.Build
+        // -playkituOutput <fresh absolute path> -playkituRuntime <absolute runtime>.
         public static void Build()
         {
             string[] args = Environment.GetCommandLineArgs();
-            int outputIndex = Array.IndexOf(args, "-playreelOutput"), runtimeIndex = Array.IndexOf(args, "-playreelRuntime");
+            int outputIndex = Array.IndexOf(args, "-playkituOutput"), runtimeIndex = Array.IndexOf(args, "-playkituRuntime");
             if (outputIndex < 0 || runtimeIndex < 0 || outputIndex + 1 >= args.Length || runtimeIndex + 1 >= args.Length)
                 throw new InvalidOperationException("Explicit sample output and native runtime are required.");
             string output = args[outputIndex + 1], runtime = args[runtimeIndex + 1];
             if (!Path.IsPathRooted(output) || !Path.IsPathRooted(runtime) || Directory.Exists(output) || !Directory.Exists(runtime))
                 throw new InvalidOperationException("Fresh absolute output and existing absolute runtime required.");
             var previous = PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone);
-            var receipt = new Receipt { executable = Path.Combine(output, "player", "PlayreelSample.exe") };
+            var receipt = new Receipt { executable = Path.Combine(output, "player", "PlaykituSample.exe") };
             Directory.CreateDirectory(output);
             try {
                 PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, ScriptingImplementation.IL2CPP);
@@ -40,7 +40,7 @@ namespace Playreel.Sample.Editor
                 receipt.result = report.summary.result.ToString(); receipt.errors = report.summary.totalErrors;
                 if (report.summary.result != BuildResult.Succeeded || report.summary.totalErrors != 0)
                     throw new InvalidOperationException("Minimal IL2CPP sample build failed.");
-                string destination = Path.Combine(output, "player", "Native", "Playreel");
+                string destination = Path.Combine(output, "player", "Native", "Playkitu");
                 foreach (string file in Directory.GetFiles(runtime, "*", SearchOption.AllDirectories)) {
                     string copy = Path.Combine(destination, file.Substring(runtime.Length + 1));
                     Directory.CreateDirectory(Path.GetDirectoryName(copy)); File.Copy(file, copy);

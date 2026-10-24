@@ -1,0 +1,12 @@
+{
+  "name": "Playkitu.Steam",
+  "references": [
+    "Playkitu.Client"
+  ],
+  "autoReferenced": false,
+  "noEngineReferences": true,
+  "includePlatforms": [
+    "Editor",
+    "WindowsStandalone64"
+  ]
+}

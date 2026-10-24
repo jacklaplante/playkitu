@@ -4,10 +4,10 @@ variables {
   expected_issuer_sha256 = filesha256("../../backend/issuer/private/issuer.zip")
   api_id                 = "abc123def4"
   api_endpoint           = "https://abc123def4.execute-api.us-east-2.amazonaws.com"
-  issuer_role_arn        = "arn:aws:iam::123456789012:role/playreel/playreel-issuer"
-  media_role_arn         = "arn:aws:iam::123456789012:role/playreel/playreel-media"
-  publisher_secret_arn   = "arn:aws:secretsmanager:us-east-2:123456789012:secret:playreel/publisher-key-AbCd12"
-  stream_arns            = [for i in range(1, 5) : "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playreel-slot-0${i}/1700000000000"]
+  issuer_role_arn        = "arn:aws:iam::123456789012:role/playkitu/playkitu-issuer"
+  media_role_arn         = "arn:aws:iam::123456789012:role/playkitu/playkitu-media"
+  publisher_secret_arn   = "arn:aws:secretsmanager:us-east-2:123456789012:secret:playkitu/publisher-key-AbCd12"
+  stream_arns            = [for i in range(1, 5) : "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-0${i}/1700000000000"]
 }
 run "runtime_limits_and_protocol" {
   command = plan
@@ -16,7 +16,7 @@ run "runtime_limits_and_protocol" {
     error_message = "Reviewed runtime/resource/cost settings changed."
   }
   assert {
-    condition     = jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYREEL_DEPLOYMENT).steamAppId == 123456 && jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYREEL_DEPLOYMENT).awsAccountId == "123456789012" && tolist(jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYREEL_DEPLOYMENT).streamArns) == var.stream_arns && !strcontains(aws_lambda_function.issuer.environment[0].variables.PLAYREEL_DEPLOYMENT, "secretValue") && length(aws_lambda_function.issuer.vpc_config) == 0
+    condition     = jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT).steamAppId == 123456 && jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT).awsAccountId == "123456789012" && tolist(jsondecode(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT).streamArns) == var.stream_arns && !strcontains(aws_lambda_function.issuer.environment[0].variables.PLAYKITU_DEPLOYMENT, "secretValue") && length(aws_lambda_function.issuer.vpc_config) == 0
     error_message = "Owner trust and reference-only environment must match the selected deployment."
   }
   assert {

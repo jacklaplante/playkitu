@@ -1,11 +1,11 @@
-using Playreel.Issuer;
+using Playkitu.Issuer;
 using System.Globalization;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed record SavedFile(string File, string Sha256, long Bytes, string Kind, int Sequence = -1);
 public sealed record SavedObject(string Kind, int Sequence, SavedFile Compressed, SavedFile Raw);

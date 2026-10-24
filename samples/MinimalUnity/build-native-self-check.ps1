@@ -32,7 +32,7 @@ $settingsHashes | ConvertTo-Json | Set-Content "$external/settings-before.json"
 $child=$null;$exitCode=$null
 try {
  $args=@('-batchmode','-nographics','-quit','-buildTarget','Win64','-job-worker-count','2','-projectPath',$project,
-  '-executeMethod','Playreel.Sample.Editor.NativeSampleBuild.Build','-playreelOutput',$Output,'-playreelRuntime',$Runtime,'-logFile',"$external/unity-build.log")
+  '-executeMethod','Playkitu.Sample.Editor.NativeSampleBuild.Build','-playkituOutput',$Output,'-playkituRuntime',$Runtime,'-logFile',"$external/unity-build.log")
  $info=[Diagnostics.ProcessStartInfo]::new($Unity)
  $info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
  $info.WorkingDirectory=$project

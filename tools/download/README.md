@@ -1,4 +1,4 @@
-# Playreel owner download tool
+# Playkitu owner download tool
 
 Read-only AWS catalogue/media retrieval plus offline inspection and log navigation.
 It preserves original compressed objects, hashes, receipts, timing claims, MKVs,

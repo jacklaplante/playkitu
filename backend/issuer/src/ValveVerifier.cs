@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 public sealed class ValveVerifier(HttpClient http, PublisherKeyProvider keys, int steamAppId) : IValveVerifier
 {

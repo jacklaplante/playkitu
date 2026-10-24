@@ -5,7 +5,7 @@ $ErrorActionPreference='Stop'
 $toolRoot=$PSScriptRoot
 $evidence=Join-Path $toolRoot ('private/runs/'+[guid]::NewGuid().ToString('N'))
 New-Item $evidence -ItemType Directory -Force | Out-Null
-$dll=Join-Path $toolRoot 'src/bin/Release/net10.0/Playreel.Retrieval.dll'
+$dll=Join-Path $toolRoot 'src/bin/Release/net10.0/Playkitu.Retrieval.dll'
 if(!(Test-Path $dll)){throw 'Run tools/download/test.ps1 first.'}
 $child=@{DOTNET_ROOT=$taskSdk;DOTNET_CLI_HOME=$env:DOTNET_CLI_HOME;DOTNET_CLI_TELEMETRY_OPTOUT='1';DOTNET_GENERATE_ASPNET_CERTIFICATE='false';AWS_EC2_METADATA_DISABLED='true';PATH=$env:PATH}
 if($Arguments.Count -and $Arguments[0] -in 'list','fetch','metadata'){

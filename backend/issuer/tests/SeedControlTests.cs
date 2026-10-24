@@ -7,7 +7,7 @@ public sealed class SeedControlTests
     [Test] public void OfflineSeedRetainsDynamoTypeCasingAndCanonicalOffState()
     {
         using var output = new StringWriter(); var before = Console.Out;
-        try { Console.SetOut(output); Assert.That(Playreel.Issuer.Program.Main(["--seed-control"]), Is.Zero); }
+        try { Console.SetOut(output); Assert.That(Playkitu.Issuer.Program.Main(["--seed-control"]), Is.Zero); }
         finally { Console.SetOut(before); }
         using var doc = JsonDocument.Parse(output.ToString()); var root = doc.RootElement;
         Assert.That(root.GetProperty("pk").GetProperty("S").GetString(), Is.EqualTo("CONTROL"));

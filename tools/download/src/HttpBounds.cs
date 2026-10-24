@@ -1,7 +1,7 @@
 using Amazon.Runtime;
 using System.Net;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 // Cap SDK metadata before JSON unmarshalling as well as payloads later copied by
 // the service. Verified HTTPS and zero redirects are the only production path.

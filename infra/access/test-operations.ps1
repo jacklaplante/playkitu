@@ -20,7 +20,7 @@ function aws {
     $script:calls.Add(($Arguments -join ' '));$global:LASTEXITCODE=0
     if($Arguments[0] -eq 'sts'){
         $role=if('deploy' -in $Arguments){'deploy'}elseif($script:wrongRole){'deploy'}else{'operations'}
-        return (@{account=$script:identityAccount;arn="arn:aws:sts::$($script:identityAccount):assumed-role/playreel-$role/offline"} | ConvertTo-Json -Compress)
+        return (@{account=$script:identityAccount;arn="arn:aws:sts::$($script:identityAccount):assumed-role/playkitu-$role/offline"} | ConvertTo-Json -Compress)
     }
     if($Arguments[0] -eq 'lambda'){return [Convert]::ToBase64String([Convert]::FromHexString($script:code))}
     if($Arguments[1] -eq 'update-item'){$global:LASTEXITCODE=$script:updateExit;return}
@@ -32,36 +32,36 @@ function aws {
 $checks=0
 function Check([string]$Name,[bool]$Condition){if(!$Condition){throw "Offline operation check failed: $Name"};$script:checks++}
 function Reject([string]$Name,[scriptblock]$Operation){$failed=$false;try{& $Operation | Out-Null}catch{$failed=$true};Check $Name $failed}
-Assert-PlayreelRole $configuration ops operations
+Assert-PlaykituRole $configuration ops operations
 $script:identityAccount='210987654321'
-Reject 'wrong account rejected' {Assert-PlayreelRole $configuration ops operations}
+Reject 'wrong account rejected' {Assert-PlaykituRole $configuration ops operations}
 $script:identityAccount='123456789012';$script:wrongRole=$true
-Reject 'wrong role rejected' {Assert-PlayreelRole $configuration ops operations}
+Reject 'wrong role rejected' {Assert-PlaykituRole $configuration ops operations}
 $script:wrongRole=$false
 $env:AWS_ACCESS_KEY_ID='OFFLINE_TEST_ONLY'
-Reject 'ambient static credentials rejected' {Assert-PlayreelRole $configuration ops operations}
+Reject 'ambient static credentials rejected' {Assert-PlaykituRole $configuration ops operations}
 Remove-Item Env:AWS_ACCESS_KEY_ID
 $env:AWS_ENDPOINT_URL_STS='http://127.0.0.1:9'
-Reject 'service-specific endpoint override rejected' {Assert-PlayreelRole $configuration ops operations}
+Reject 'service-specific endpoint override rejected' {Assert-PlaykituRole $configuration ops operations}
 Remove-Item Env:AWS_ENDPOINT_URL_STS
 $allowanceParameters=@{ConfigurationFile=$configuration;OperationsProfile='ops';DeployProfile='deploy';PlannedAdmissions=1;ReviewedIssuerSha256=('1'*64)}
-$a=Get-PlayreelAllowance @allowanceParameters
+$a=Get-PlaykituAllowance @allowanceParameters
 Check 'finite conservative allowance' ($a.AllowanceAvailable -and $a.GlobalDailyRemaining -eq 6 -and $a.GlobalMonthlyRemaining -eq 38 -and $a.ConservativeTesterRemaining -eq 5)
-$script:daily=8;Check 'global daily ceiling' (!(Get-PlayreelAllowance @allowanceParameters).AllowanceAvailable);$script:daily=2
-$script:monthly=50;Check 'global monthly ceiling' (!(Get-PlayreelAllowance @allowanceParameters).AllowanceAvailable);$script:monthly=12
-$script:tester=8;Check 'tester ceiling' (!(Get-PlayreelAllowance @allowanceParameters).AllowanceAvailable);$script:tester=3
-$script:active=@{fake=@{}};Check 'stored lease prevents activation' (!(Get-PlayreelAllowance @allowanceParameters).AllowanceAvailable);$script:active=@{}
-$script:unknownState=$true;Reject 'unknown calendar state fails closed' {Get-PlayreelAllowance @allowanceParameters};$script:unknownState=$false
-$script:code=('2'*64);Reject 'unreviewed live issuer rejected' {Get-PlayreelAllowance @allowanceParameters};$script:code=('1'*64)
+$script:daily=8;Check 'global daily ceiling' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:daily=2
+$script:monthly=50;Check 'global monthly ceiling' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:monthly=12
+$script:tester=8;Check 'tester ceiling' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:tester=3
+$script:active=@{fake=@{}};Check 'stored lease prevents activation' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:active=@{}
+$script:unknownState=$true;Reject 'unknown calendar state fails closed' {Get-PlaykituAllowance @allowanceParameters};$script:unknownState=$false
+$script:code=('2'*64);Reject 'unreviewed live issuer rejected' {Get-PlaykituAllowance @allowanceParameters};$script:code=('1'*64)
 & "$PSScriptRoot/prepare-control.ps1" -ConfigurationFile $configuration -OutputDirectory "$fixtureRoot/controls"
 $control=@{ConfigurationFile=$configuration;Profile='ops';Request="$fixtureRoot/controls/control-switch.json";ReadRequest="$fixtureRoot/controls/control-read.json";AdmissionsEnabled=$false;UploadsEnabled=$false}
-$v=Set-PlayreelControls @control
+$v=Set-PlaykituControls @control
 Check 'strong actual OFF booleans' ($v.admissions -is [bool] -and !$v.admissions -and $v.uploads -is [bool] -and !$v.uploads)
-$script:badFlags=$true;Reject 'null strong read is not OFF' {Set-PlayreelControls @control};$script:badFlags=$false
-$script:updateExit=1;Reject 'failed update is not success' {Set-PlayreelControls @control};$script:updateExit=0
+$script:badFlags=$true;Reject 'null strong read is not OFF' {Set-PlaykituControls @control};$script:badFlags=$false
+$script:updateExit=1;Reject 'failed update is not success' {Set-PlaykituControls @control};$script:updateExit=0
 $change=Get-Content $control.Request -Raw | ConvertFrom-Json -AsHashtable
 $change.ReturnValues='ALL_NEW';$change | ConvertTo-Json -Depth 10 | Set-Content $control.Request
-$before=$script:calls.Count;Reject 'unsafe request cannot return raw CONTROL' {Set-PlayreelControls @control}
+$before=$script:calls.Count;Reject 'unsafe request cannot return raw CONTROL' {Set-PlaykituControls @control}
 Check 'unsafe change never reaches DynamoDB' (@($script:calls | Select-Object -Skip $before | Where-Object {$_ -like 'dynamodb*'}).Count -eq 0)
 # A second project must retain the exact routine-role scope, not silently
 # lose access or expand it to issuer/media. Everything below only renders JSON.

@@ -1,8 +1,0 @@
-{
-  "name": "Playreel.Lifecycle.Tests",
-  "references": ["Playreel.Client", "Playreel.Native", "Playreel.Producer", "Playreel.Gameplay", "Unity.Newtonsoft.Json"],
-  "optionalUnityReferences": ["TestAssemblies"],
-  "overrideReferences": true,
-  "precompiledReferences": ["Newtonsoft.Json.dll"],
-  "autoReferenced": false
-}

@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using NUnit.Framework;
-using Playreel.Issuer;
+using Playkitu.Issuer;
 
-namespace Playreel.Tests;
+namespace Playkitu.Tests;
 
 // Optional private export from the actual accelerated Unity uploader. No fixture
 // regeneration or raw timing edits: validate/use the exact exported gzip bytes.

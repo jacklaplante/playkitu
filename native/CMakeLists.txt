@@ -49,7 +49,7 @@ target_link_libraries(native-media-config-tests PRIVATE proof-core media-clock-c
 # Export-negative fixture is never packaged. It reproduces an old DLL's missing
 # capability while preserving every other real loader/CREATED-only operation.
 add_library(native-region-legacy-fixture SHARED native-adapter.cpp native-synthetic-runner.cpp)
-target_compile_definitions(native-region-legacy-fixture PRIVATE NOMINMAX PLAYREEL_REGION_CAPABILITY_NEGATIVE)
+target_compile_definitions(native-region-legacy-fixture PRIVATE NOMINMAX PLAYKITU_REGION_CAPABILITY_NEGATIVE)
 target_link_libraries(native-region-legacy-fixture PRIVATE proof-core media-clock-core PkgConfig::GST_APP)
 set_target_properties(native-region-legacy-fixture PROPERTIES OUTPUT_NAME PlaytestRecordingNativeProof RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/legacy")
 if(SBREC_SDK_C_SOURCE)

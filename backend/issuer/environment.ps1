@@ -1,7 +1,7 @@
 $ErrorActionPreference='Stop'
 $taskRoot=$PSScriptRoot
 $taskPrivate=Join-Path $taskRoot 'private'
-$taskSdk=if($env:PLAYREEL_DOTNET_ROOT){[IO.Path]::GetFullPath($env:PLAYREEL_DOTNET_ROOT)}else{Join-Path $taskPrivate 'sdk'}
+$taskSdk=if($env:PLAYKITU_DOTNET_ROOT){[IO.Path]::GetFullPath($env:PLAYKITU_DOTNET_ROOT)}else{Join-Path $taskPrivate 'sdk'}
 $env:DOTNET_ROOT=$taskSdk
 $env:DOTNET_CLI_HOME=Join-Path $taskPrivate 'cli'
 $env:NUGET_PACKAGES=Join-Path $taskPrivate 'packages'

@@ -10,7 +10,7 @@ using System.Text.Json;
 using System.Diagnostics;
 
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 public sealed class Function
 {
@@ -120,7 +120,7 @@ public sealed class Function
         // Configuration validation precedes construction of AWS clients. Offline tests never
         // invoke this factory; their clients use explicit fake credentials and blocked transports.
         string Required(string name) => Environment.GetEnvironmentVariable(name) ?? throw new InvalidOperationException("Missing issuer configuration.");
-        var options = JsonSerializer.Deserialize<IssuerOptions>(Required("PLAYREEL_DEPLOYMENT"), Wire.Json)
+        var options = JsonSerializer.Deserialize<IssuerOptions>(Required("PLAYKITU_DEPLOYMENT"), Wire.Json)
             ?? throw new InvalidOperationException("Missing issuer configuration.");
         options.Validate();
         AWSConfigs.LoggingConfig.LogTo = LoggingOptions.None;

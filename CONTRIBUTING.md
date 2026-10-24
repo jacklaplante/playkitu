@@ -1,8 +1,8 @@
 # Contributing
 
-Contributions are welcome! playreel is open to community bug fixes, documentation improvements, examples, tests and work toward additional platforms. Small improvements are useful too.
+Contributions are welcome! playkitu is open to community bug fixes, documentation improvements, examples, tests and work toward additional platforms. Small improvements are useful too.
 
-Open an [issue](https://github.com/jacklaplante/playreel/issues) to report a problem or discuss an idea, or send a [pull request](https://github.com/jacklaplante/playreel/pulls). For larger changes, an issue is a good place to discuss the approach before investing lots of work. Current Windows-only support describes what works today, not a permanent limit on contributions.
+Open an [issue](https://github.com/jacklaplante/playkitu/issues) to report a problem or discuss an idea, or send a [pull request](https://github.com/jacklaplante/playkitu/pulls). For larger changes, an issue is a good place to discuss the approach before investing lots of work. Current Windows-only support describes what works today, not a permanent limit on contributions.
 
 For bug reports, start with a small reproducible problem and the component that owns it. Include Unity/OS/tool versions, render/audio configuration, expected behavior and the smallest reproduction.
 

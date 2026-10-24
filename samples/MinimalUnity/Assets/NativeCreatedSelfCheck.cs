@@ -1,10 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
-using Playreel.Producer;
+using Playkitu.Producer;
 using UnityEngine;
 
-namespace Playreel.Sample
+namespace Playkitu.Sample
 {
     // Explicitly rooted direct calls exercise the shipped IL2CPP delegate path.
     // Default sample startup remains inert. No SDK Start or region setup exists here.
@@ -21,14 +21,14 @@ namespace Playreel.Sample
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RunIfRequested()
         {
-            if (!Environment.GetCommandLineArgs().Contains("--playreel-native-self-check")) return;
+            if (!Environment.GetCommandLineArgs().Contains("--playkitu-native-self-check")) return;
             string applicationRoot = Directory.GetParent(Application.dataPath).FullName;
             string output = Path.Combine(applicationRoot, "native-self-check.json");
             var receipt = new Receipt();
             ProductionNativeRun run = null;
             try {
                 if (File.Exists(output)) throw new InvalidOperationException("self_check_output_exists");
-                run = new ProductionNativeRun(Path.Combine(applicationRoot, "Native", "Playreel"));
+                run = new ProductionNativeRun(Path.Combine(applicationRoot, "Native", "Playkitu"));
                 run.Load();
                 if (run.Error != null) throw new InvalidOperationException(run.Error);
                 receipt.clockFrequency = run.ReadClock().Frequency;
@@ -45,7 +45,7 @@ namespace Playreel.Sample
                     using (var file = new FileStream(output, FileMode.CreateNew, FileAccess.Write))
                     using (var text = new StreamWriter(file)) text.Write(JsonUtility.ToJson(receipt, true));
                 } catch { receipt.passed = false; }
-                Debug.Log("PLAYREEL_CREATED_SELF_CHECK passed=" + receipt.passed + " released=" + receipt.released);
+                Debug.Log("PLAYKITU_CREATED_SELF_CHECK passed=" + receipt.passed + " released=" + receipt.released);
                 Application.Quit(receipt.passed ? 0 : 3);
             }
         }

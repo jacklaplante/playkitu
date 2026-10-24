@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Playreel.Issuer;
+namespace Playkitu.Issuer;
 
 // Owner-supplied deployment trust. Never construct this from an issuer response,
 // player request, downloaded manifest, environment endpoint override or ARN discovery.
@@ -12,7 +12,7 @@ public class Deployment
     public int SteamAppId { get; init; }
     public string IssuerOrigin { get; init; } = "";
     public string Project { get; init; } = "";
-    public string RolePath { get; init; } = "/playreel/";
+    public string RolePath { get; init; } = "/playkitu/";
     public string StreamNamePrefix { get; init; } = "";
     public string Table { get; init; } = "";
     [System.Text.Json.Serialization.JsonPropertyName("uploadBucket")]
@@ -21,8 +21,8 @@ public class Deployment
     public string MediaRoleArn { get; init; } = "";
     public string RetrievalRoleArn { get; init; } = "";
     public string[] StreamArns { get; init; } = [];
-    public string IdentityPrefix { get; init; } = Playreel.Client.RecordingIdentity.Prefix;
-    public string IdentityDomain { get; init; } = "playreel-recording:";
+    public string IdentityPrefix { get; init; } = Playkitu.Client.RecordingIdentity.Prefix;
+    public string IdentityDomain { get; init; } = "playkitu-recording:";
 
     public void Validate()
     {

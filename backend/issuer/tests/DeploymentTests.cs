@@ -1,8 +1,8 @@
 using System.Text.Json;
 using NUnit.Framework;
 using System.Text.Json.Nodes;
-using Playreel.Issuer;
-using Playreel.Tests;
+using Playkitu.Issuer;
+using Playkitu.Tests;
 namespace Issuer.Tests;
 
 [TestFixture]
@@ -17,7 +17,7 @@ public sealed class DeploymentTests
             ("awsAccountId", "999999999999"), ("awsRegion", "us-west-2"),
             ("issuerOrigin", "https://attacker.example/"),
             ("mediaRoleArn", $"arn:aws:iam::{account}:role/Administrator"),
-            ("publisherSecretArn", $"arn:aws:secretsmanager:{region}:999999999999:secret:playreel/publisher-key-AbCd12") })
+            ("publisherSecretArn", $"arn:aws:secretsmanager:{region}:999999999999:secret:playkitu/publisher-key-AbCd12") })
         {
             var json = JsonSerializer.SerializeToNode(value, Wire.Json)!.AsObject();
             json[change.Item1] = change.Item2;
@@ -25,7 +25,7 @@ public sealed class DeploymentTests
             Assert.Throws<InvalidOperationException>(bad.Validate, change.Item1);
         }
         var streams = JsonSerializer.SerializeToNode(value, Wire.Json)!.AsObject();
-        streams["streamArns"]![0] = $"arn:aws:kinesisvideo:{region}:999999999999:stream/playreel-slot-01/1234";
+        streams["streamArns"]![0] = $"arn:aws:kinesisvideo:{region}:999999999999:stream/playkitu-slot-01/1234";
         Assert.Throws<InvalidOperationException>(streams.Deserialize<Deployment>(Wire.Json)!.Validate);
     }
 
@@ -34,8 +34,8 @@ public sealed class DeploymentTests
         var value = DeploymentFixture.Create();
         var session = Guid.Parse("11111111-2222-3333-4444-555555555555");
         const string proof = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-        Assert.That(Wire.Identity(session, 1700000000, proof), Is.EqualTo(Playreel.Client.RecordingIdentity.Identity(session, 1700000000, proof, value.IdentityPrefix, value.IdentityDomain)));
-        Assert.That(Wire.Identity(session, 1700000000, proof), Does.StartWith("prrec2:"));
+        Assert.That(Wire.Identity(session, 1700000000, proof), Is.EqualTo(Playkitu.Client.RecordingIdentity.Identity(session, 1700000000, proof, value.IdentityPrefix, value.IdentityDomain)));
+        Assert.That(Wire.Identity(session, 1700000000, proof), Does.StartWith("pkrec2:"));
     }
 }
 

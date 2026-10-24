@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json;
 using System.Globalization;
 using NUnit.Framework;
-using Playreel.Retrieval;
+using Playkitu.Retrieval;
 
 namespace Retrieval.Tests;
 

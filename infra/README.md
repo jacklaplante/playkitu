@@ -1,4 +1,4 @@
-# Playreel AWS infrastructure
+# Playkitu AWS infrastructure
 
 Source-only deployment workflow for one explicitly selected AWS account/region and
 Steam app. No existing deployment, API, secret, verified email subscription or
@@ -50,7 +50,7 @@ pwsh -NoProfile -File infra/test.ps1
 
 Terraform 1.16.6 and AWS provider 6.69.0 are pinned. Initialization uses
 `-backend=false`; tests use mocked providers, fake credentials and blocked outbound
-HTTP(S). No live Terraform plan/apply is used by tests. `PLAYREEL_TERRAFORM` may
+HTTP(S). No live Terraform plan/apply is used by tests. `PLAYKITU_TERRAFORM` may
 select an existing exact Terraform binary. Generated files stay in `infra/private`.
 
 ## Owner deployment sequence (not executed by these scripts)

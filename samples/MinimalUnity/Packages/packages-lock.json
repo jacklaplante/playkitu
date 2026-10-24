@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "com.playreel.recording": {
-      "version": "file:../../../packages/com.playreel.recording",
+    "com.playkitu.recording": {
+      "version": "file:../../../packages/com.playkitu.recording",
       "depth": 0,
       "source": "local",
       "dependencies": {

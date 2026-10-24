@@ -2,20 +2,20 @@ using System;
 using System.Collections;
 using System.Text;
 using System.Threading;
-using Playreel.Client;
-using Playreel.Gameplay;
+using Playkitu.Client;
+using Playkitu.Gameplay;
 using UnityEngine;
-namespace Playreel.Sample {
+namespace Playkitu.Sample {
 public sealed class OfflineConsentExample : MonoBehaviour {
- bool consent; PlayreelRecorder recorder;
+ bool consent; PlaykituRecorder recorder;
  void OnGUI(){
  GUILayout.BeginArea(new Rect(20,20,660,300),GUI.skin.box);
- GUILayout.Label("playreel: offline lifecycle sample");
+ GUILayout.Label("playkitu: offline lifecycle sample");
  GUILayout.Label("No cloud, native runtime, Steam ticket or microphone is used here.");
  consent=GUILayout.Toggle(consent,"I understand a production session records game video/audio and uploads diagnostic logs.");
  GUI.enabled=consent&&recorder==null;
  if(GUILayout.Button("Run local consent / stop check")){
- recorder=gameObject.AddComponent<PlayreelRecorder>();
+ recorder=gameObject.AddComponent<PlaykituRecorder>();
  recorder.Begin(consent,false,new OfflineFactory(),RecordingProfile.Standard().Freeze(),Application.dataPath,"sample");
  }
  GUI.enabled=true;
@@ -26,7 +26,7 @@ public sealed class OfflineConsentExample : MonoBehaviour {
  sealed class OfflineFactory:IRecordingFactory,IRecordingTransport,IRecordingTickets {
  public bool IsLive=>false;
  public RecordingDependencies CreateAfterConsent()=>new RecordingDependencies{
- Trust=new RecordingTrust(480,"012345678901","us-east-1","https://example.execute-api.us-east-1.amazonaws.com/","playreel-","example-playreel-uploads"),
+ Trust=new RecordingTrust(480,"012345678901","us-east-1","https://example.execute-api.us-east-1.amazonaws.com/","playkitu-","example-playkitu-uploads"),
  Issuer=this,Tickets=this,Runner=_=>new Runner()};
  public IRecordingHttpOperation Begin(RecordingHttpRequest request){request.Validate();return new Operation();}
  public IEnumerator Begin(string identity,Func<string,IEnumerator> consumer,Action<string> failure,CancellationToken cancellation){failure("ticket_unavailable");yield break;}

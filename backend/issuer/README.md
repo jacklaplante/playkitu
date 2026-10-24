@@ -1,4 +1,4 @@
-# Playreel authorization service
+# Playkitu authorization service
 
 .NET 10 / AWS Lambda service for Steam-authenticated Windows Unity recordings.
 This source has been tested offline; shipping this directory does not deploy or
@@ -17,13 +17,13 @@ pwsh -NoProfile -File backend/issuer/package.ps1
 Preparation obtains the SHA512-pinned .NET SDK 10.0.402 and restores locked NuGet
 packages. It uses ignored `private/` directories, disables development certificate
 creation/telemetry/metadata credential discovery, and never installs a global SDK.
-An existing exact SDK may be selected with `PLAYREEL_DOTNET_ROOT`.
+An existing exact SDK may be selected with `PLAYKITU_DOTNET_ROOT`.
 The normalized Linux x64 managed ZIP is `private/issuer.zip`; its receipt is
 `private/evidence/artifact.json`. Review that newly built hash before deployment.
 No historical deployment hash is an accepted default.
 
-The Lambda handler is `Playreel.Issuer::Playreel.Issuer.Function::HandleAsync`.
-Terraform sets `PLAYREEL_DEPLOYMENT` to nonsecret owner trust/resource references.
+The Lambda handler is `Playkitu.Issuer::Playkitu.Issuer.Function::HandleAsync`.
+Terraform sets `PLAYKITU_DEPLOYMENT` to nonsecret owner trust/resource references.
 The service validates it before constructing any AWS client. The publisher key
 value is read only from the configured Secrets Manager secret. Provision its
 restricted Steam publisher key privately outside Terraform; never pass it through
@@ -34,7 +34,7 @@ Terraform variables, state, command arguments, manifests, source or logs.
 Owner settings bind the Steam app, AWS account/region, exact issuer origin, four
 ordered stream ARNs, bucket/table, role path, media/retrieval roles and secret ARN.
 These values cannot come from a player request or downloaded recording. Defaults
-for identity encoding are `prrec2:` and `playreel-recording:`. An integrator may
+for identity encoding are `pkrec2:` and `playkitu-recording:`. An integrator may
 explicitly configure a different identity prefix/domain on BOTH client and issuer;
 there is no automatic downgrade or fallback. The portable package supplies the
 single canonical identity/proof and diagnostic-limit sources.

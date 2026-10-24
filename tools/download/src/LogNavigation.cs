@@ -2,10 +2,10 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Playreel.Client;
-using Playreel.Issuer;
+using Playkitu.Client;
+using Playkitu.Issuer;
 
-namespace Playreel.Retrieval;
+namespace Playkitu.Retrieval;
 
 public sealed class LogNavigationResult
 {

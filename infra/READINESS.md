@@ -20,8 +20,8 @@ ambient static credentials and endpoint overrides in this dedicated shell.
 
 ```powershell
 . ./infra/access/operations.ps1
-Assert-PlayreelRole -ConfigurationFile ABSOLUTE_OWNER_CONFIG -Profile OWNER_OPERATIONS_PROCESS_PROFILE -Role operations
-Get-PlayreelAllowance -ConfigurationFile ABSOLUTE_OWNER_CONFIG -OperationsProfile OWNER_OPERATIONS_PROCESS_PROFILE -DeployProfile OWNER_DEPLOY_PROCESS_PROFILE -PlannedAdmissions 1 -ReviewedIssuerSha256 REVIEWED_NEW_ZIP_SHA256
+Assert-PlaykituRole -ConfigurationFile ABSOLUTE_OWNER_CONFIG -Profile OWNER_OPERATIONS_PROCESS_PROFILE -Role operations
+Get-PlaykituAllowance -ConfigurationFile ABSOLUTE_OWNER_CONFIG -OperationsProfile OWNER_OPERATIONS_PROCESS_PROFILE -DeployProfile OWNER_DEPLOY_PROCESS_PROFILE -PlannedAdmissions 1 -ReviewedIssuerSha256 REVIEWED_NEW_ZIP_SHA256
 ```
 
 These functions make calls only when explicitly invoked. Allowance verifies the
@@ -41,7 +41,7 @@ admission, admissions OFF/uploads ON prevents more starts while preserving that
 session's finite upload/finalization path. Global OFF is both false.
 
 ```powershell
-Set-PlayreelControls -ConfigurationFile ABSOLUTE_OWNER_CONFIG -Profile OWNER_OPERATIONS_PROCESS_PROFILE -Request ABSOLUTE_PREPARED_SWITCH_JSON -ReadRequest ABSOLUTE_PREPARED_READ_JSON -AdmissionsEnabled $false -UploadsEnabled $false
+Set-PlaykituControls -ConfigurationFile ABSOLUTE_OWNER_CONFIG -Profile OWNER_OPERATIONS_PROCESS_PROFILE -Request ABSOLUTE_PREPARED_SWITCH_JSON -ReadRequest ABSOLUTE_PREPARED_READ_JSON -AdmissionsEnabled $false -UploadsEnabled $false
 ```
 
 The update is followed by strong readback and must return the two actual expected

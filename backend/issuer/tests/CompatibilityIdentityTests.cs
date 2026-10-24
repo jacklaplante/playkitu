@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using NUnit.Framework;
-using Playreel.Client;
-using Playreel.Tests;
+using Playkitu.Client;
+using Playkitu.Tests;
 namespace Issuer.Tests;
 
 [TestFixture]
