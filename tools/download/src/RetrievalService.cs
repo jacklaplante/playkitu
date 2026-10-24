@@ -178,7 +178,10 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
             }
             if (claims.Any(c => !returned.Any(f => f.Id == c.Id))) bundle.Issues.Add("claimed_fragment_not_listed");
             if (attributed.Count == 0) { bundle.Issues.Add("media_attribution_unavailable"); continue; }
-            foreach (var group in attributed.GroupBy(x => x.Claim.Upload))
+            // Kinesis ListFragments is unordered, including across upload
+            // reconnects. Keep each upload separate, but emit its batches in
+            // producer-time order so a library starts with the opening footage.
+            foreach (var group in attributed.GroupBy(x => x.Claim.Upload).OrderBy(g => g.Min(x => x.Fragment.ProducerUtc)))
             {
                 var batch = new List<FragmentEntry>(); long bytes = 0;
                 foreach (var item in group.OrderBy(x => x.Fragment.ProducerUtc))

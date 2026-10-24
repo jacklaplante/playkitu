@@ -22,6 +22,21 @@ public sealed class RetrievalTests
     private async Task<RetrievalBundle> Fetch(FixtureStore store, RetrievalLimits? limits = null, FixtureProbe? probe = null) =>
         await new RetrievalService(store, probe ?? new FixtureProbe(), limits).FetchAsync(FixtureStore.Id, Output, CancellationToken.None);
 
+    [Test] public async Task ReconnectedUploadsPlayInTimeOrderWhenAwsReturnsLaterFragmentsFirst()
+    {
+        var store = new FixtureStore(); var index = store.Index();
+        var later = index["records"]![0]!.DeepClone();
+        later["fragment"] = "frag2"; later["upload"] = 1UL;
+        later["ackTimecodeMs"] = FixtureStore.First / 10000 + 500;
+        index["records"]!.AsArray().Add(later); store.Ready(index);
+        store.Fragments.Insert(0, new("frag2", TimingEvidence.Unix(FixtureStore.First + 5000000), 100, 32));
+
+        var result = await Fetch(store);
+
+        Assert.That(result.Media.Select(m => m.Upload), Is.EqualTo(new[] { ulong.MaxValue - 1, 1UL }));
+        Assert.That(store.RequestedFragments.SelectMany(ids => ids), Is.EqualTo(new[] { "frag1", "frag2" }));
+    }
+
     [Test] public async Task FullReceiptVerifiedRetrievalPreservesSplitUtf8AndMultilineLogs()
     {
         var store = new FixtureStore(); store.Ready();

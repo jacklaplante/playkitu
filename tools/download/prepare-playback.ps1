@@ -23,9 +23,14 @@ try {
     # Rewrap the recorded H.264/AAC tracks; no decode, re-encode, recording or
     # credentials. Originals stay immutable. Keep each retrieved part separate
     # rather than concealing missing fragments behind a stitched timeline.
+    # Kinesis MKVs contain fragment segment boundaries. A queue's default
+    # one-second limit can block the shared demuxer while mp4mux waits for the
+    # other track. Let each compressed track buffer this entire bounded input;
+    # the 64 MB file guard above still bounds memory, with no decoded frames.
+    $trackQueue=@('queue','max-size-buffers=0','max-size-time=0','max-size-bytes=67108864')
     $pipeline=@('-q','-e','filesrc',('location="'+$InputFile.Replace('\','/')+'"'),'!','matroskademux','name=d',
-        'd.video_0','!','queue','!','h264parse','!','mux.',
-        'd.audio_0','!','queue','!','aacparse','!','mux.',
+        'd.video_0','!')+$trackQueue+@('!','h264parse','!','mux.',
+        'd.audio_0','!')+$trackQueue+@('!','aacparse','!','mux.',
         'mp4mux','name=mux','faststart=true','!','filesink',('location="'+$Output.Replace('\','/')+'"'))
     $result=Invoke-BoundedProcess "$RuntimeDirectory/bin/gst-launch-1.0.exe" $pipeline $work "$work/remux.log" 35 $envs -MinimalEnvironment
     if($result.ExitCode -or !(Test-Path -LiteralPath $Output) -or (Get-Item -LiteralPath $Output).Length -eq 0){exit 3}
