@@ -31,7 +31,7 @@ Terraform variables, state, command arguments, manifests, source or logs.
 
 ## Trust and protocol
 
-Owner settings bind the Steam app, AWS account/region, exact issuer origin, four
+Owner settings bind the Steam app, AWS account/region, exact issuer origin, the
 ordered stream ARNs, bucket/table, role path, media/retrieval roles and secret ARN.
 These values cannot come from a player request or downloaded recording. Defaults
 for identity encoding are `pkrec2:` and `playkitu-recording:`. An integrator may
@@ -46,7 +46,7 @@ using Valve's `str:` representation and requires an active app ownership verdict
 Consent validation precedes authentication/state mutation. Replay fencing,
 canonical 256-bit bearer proofs, immutable bindings and atomic reservations remain.
 
-Limits: four precreated streams, eight active/pending admissions, one session per
+Limits: a configured pool of 1–8 precreated streams (four by default), eight active/pending admissions, one session per
 tester; eight successful admissions/tester/UTC day, eight globally/day and fifty
 monthly, without refunds. Sessions have a 14,400-second media deadline and
 180-second inactivity timeout. Optional negotiated diagnostic finalization is
@@ -55,6 +55,12 @@ retains the original binding encoding and 64 MiB/4096-object diagnostic budget;
 opt-in permits 256 MiB/8192 objects with 4096 identities per kind. Client attempted
 bytes remain 512 MiB. All lifetimes, per-object/request caps, quarantine and
 publication-after-deadline guards stay finite and tested.
+
+These admission quotas are backend code limits, independent of `videoStreamCount`.
+Closing does not refund an admission. Full/quarantined video pools can admit
+logs-only sessions; slot reuse waits until 50 minutes after the last credential's
+expiry. See [current limitations](../../docs/limitations.md) and
+[safe capacity changes](../../docs/capacity.md).
 
 `seed.ps1` emits the canonical model's initial CONTROL item OFF/OFF, without
 constructing AWS clients. The infrastructure helper wraps it in a conditional

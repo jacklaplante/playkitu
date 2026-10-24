@@ -13,6 +13,13 @@ playkitu helps developers see their game through a playtester's eyes. Players co
 
 **Experimental, source-first release.** Independent Unity import, lifecycle, native, backend, download and infrastructure checks pass. A small Windows IL2CPP sample also passes native loading and cleanup. A freshly deployed end-to-end installation and clean-machine support remain release checks. Prebuilt native binaries are not distributed here.
 
+**Capacity is deliberately small by default:** four video streams, eight admissions
+per UTC day and fifty per UTC month. A full or quarantined video pool can produce
+logs-only sessions. Stream reuse is delayed after a recording ends. Pool size is
+configurable from 1–8; admission quotas are separate backend limits. Read the
+[current limitations](docs/limitations.md) and [capacity guide](docs/capacity.md)
+before planning a playtest. This is not an automatically scaling service.
+
 [Try the sample](#try-it-locally) · [Integrate Unity](docs/unity-integration.md) · [Deploy AWS](infra/README.md) · [Download recordings](tools/download/README.md) · [Development](docs/development.md)
 
 ## What you get

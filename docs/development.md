@@ -2,6 +2,50 @@
 
 Use the smallest loop that answers the question: the minimal Unity project for package behavior, an existing Steam owner for authentication, native targets for media/ABI, and a player for IL2CPP/distribution.
 
+Read [AGENTS.md](../AGENTS.md) for maintenance invariants and
+[current limits](limitations.md) before making readiness or capacity claims.
+
+## Edit a package without publishing
+
+Clone this repository beside your game's repository. Keep reusable changes here
+and game-specific consent, Steam ownership and deployment bindings in the game.
+The sample already uses this checkout through its local `file:` dependency:
+editing `packages/com.playkitu.recording` is enough for the sample to import it.
+
+For a host game, choose **Add package from disk** in Unity Package Manager and
+select this checkout's `packages/com.playkitu.recording/package.json`. Unity then
+uses that source directly; do not edit `Library/PackageCache`. Refresh the Editor
+and run the affected package/adapter tests. Ordinary import and offline tests do
+not request recording or microphone consent, activate capture or change AWS.
+
+Keep the host's original manifest and lockfile before switching dependencies.
+After validating a change, commit/push the reusable source, pin the host to the
+reviewed full Git commit, let Unity resolve its lockfile, and rerun affected host
+checks. Commit host integration changes separately. Avoid committing a machine's
+local `file:` override unless the host intentionally adopts that workflow.
+
+Managed-only changes need no native rebuild unless the ABI/capability contract
+changed. Native changes require rebuilding/packaging that runtime, then focused
+native/managed-boundary checks. No full game build is needed until packaging or
+an actual player difference is the question. Do not reuse stale native binaries
+as evidence for a changed native source tree.
+
+## Choose the test loop
+
+| Change | First proof |
+| --- | --- |
+| Consent/lifecycle, capture scheduling, gains | MinimalUnity EditMode/PlayMode tests; host Editor for its adapter/Steam context |
+| Native media, pacing, ABI or cleanup | Focused native target/generated-media test; managed boundary if ABI changed |
+| Steam authorization/backend | Issuer tests; existing host Editor integration for a real ticket when authorized |
+| Library, download ordering, preview conversion | Download tests and an explicitly selected local generated/downloaded file; no new capture |
+| Terraform, policies, capacity | Mocked infra/offline operations tests and existing-state migration review before any live change |
+| IL2CPP/native distribution | Small sample player first; a full host build only for actual host packaging |
+
+Stop the library process you started before rebuilding its loaded .NET files on
+Windows. Cached downloaded media can reproduce converter faults without another
+AWS fetch or recording. Run test launchers in separate `pwsh` processes so their
+fake credentials/proxy isolation cannot replace a live operator shell's settings.
+
 ## Local entry points
 
 From the repository root with PowerShell 7:
