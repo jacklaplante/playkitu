@@ -87,7 +87,7 @@ public sealed class AwsReadStore(IAmazonDynamoDB dynamo, IAmazonS3 s3, IAmazonKi
     }
     public async Task<string> StreamArnAsync(int slot, CancellationToken ct)
     {
-        if (slot is < 0 or > 3) throw new RetrievalError("invalid_slot");
+        if (slot < 0 || slot >= deployment.StreamArns.Length) throw new RetrievalError("invalid_slot");
         var expected = deployment.StreamArns[slot];
         var name = expected.Split('/')[1];
         var response = await video.DescribeStreamAsync(new() { StreamName = name }, ct);

@@ -54,10 +54,10 @@ variable "publisher_secret_arn" {
 variable "stream_arns" {
   type = list(string)
   validation {
-    condition = length(var.stream_arns) == 4 && length(toset(var.stream_arns)) == 4 && alltrue([
+    condition = length(var.stream_arns) == local.c.video_stream_count && length(toset(var.stream_arns)) == local.c.video_stream_count && alltrue([
       for i, arn in var.stream_arns : can(regex("^arn:aws:kinesisvideo:${local.c.region}:${local.c.account}:stream/${local.c.stream_name_prefix}0${i + 1}/[0-9]+$", arn))
     ])
-    error_message = "Use four distinct actual slot stream ARNs, ordered 01 through 04."
+    error_message = "Use the configured number of distinct actual slot stream ARNs, ordered from 01."
   }
 }
 variable "issuer_zip" {

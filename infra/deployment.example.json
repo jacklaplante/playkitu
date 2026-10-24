@@ -3,6 +3,7 @@
   "awsRegion": "us-east-2",
   "steamAppId": 123456,
   "project": "playkitu",
+  "videoStreamCount": 4,
   "rolePath": "/playkitu/",
   "alertEmail": "alerts@example.invalid",
   "identityPrefix": "pkrec2:",

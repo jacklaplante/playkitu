@@ -27,7 +27,7 @@ public sealed class DynamoIssuerStore(IAmazonDynamoDB client, string table)
         if (response.Item is null || !response.Item.TryGetValue("admissionsEnabled", out var ae) || !response.Item.TryGetValue("uploadsEnabled", out var ue))
             throw new IssuerError(503, "issuer_not_configured");
         var state = Decode<GlobalState>(response.Item);
-        if (state.Value.Slots.Length != 4 || state.Value.Pending.Count > 8 || state.Value.Active.Count > 8) throw new IssuerError(503, "invalid_issuer_state");
+        if (state.Value.Slots.Length is < 1 or > Deployment.MaxVideoStreams || state.Value.Pending.Count > 8 || state.Value.Active.Count > 8) throw new IssuerError(503, "invalid_issuer_state");
         return new(state, ae.BOOL == true, ue.BOOL == true);
     }
 

@@ -77,6 +77,17 @@ run "owner_storage_and_boundaries" {
     error_message = "Player media role must not acquire reads/configuration/resource creation."
   }
 }
+
+run "configured_eight_stream_pool" {
+  command = plan
+  variables {
+    configuration_file = "../private/tests/deployment-eight.json"
+  }
+  assert {
+    condition     = length(aws_kinesis_video_stream.slot) == 8 && aws_kinesis_video_stream.slot["08"].name == "playkitu-slot-08"
+    error_message = "videoStreamCount must control the entire numbered stream pool."
+  }
+}
 run "readiness_delta" {
   command = plan
   variables {

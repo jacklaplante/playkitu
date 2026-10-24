@@ -11,7 +11,7 @@ Three staged roots keep privileged owner bootstrap separate from routine deploym
 1. `foundation`: an empty named HTTP API; optionally its AWS-managed service-linked
    role only when the owner confirms it is absent. Do not import/manage an existing
    shared role.
-2. `bootstrap`: four retained KVS streams, private encrypted S3 state/diagnostics,
+2. `bootstrap`: a configured pool of retained KVS streams (four by default), private encrypted S3 state/diagnostics,
    DynamoDB, secret metadata, roles under a console-owned permissions boundary,
    closed API stage, alerts and disabled cleanup. Routine deploy cannot edit IAM,
    read publisher secrets or grant invocation permissions.
@@ -29,7 +29,9 @@ are suspended with current/noncurrent expiry and incomplete multipart cleanup.
 DynamoDB TTL is eventual cleanup, not lease authority. Resource deletion protection
 and `prevent_destroy` remain enabled; removal is a separate owner-reviewed action.
 Quotas are eight admissions/tester/day, eight globally/day and fifty/month, no
-refunds; four streams and finite session/object/request limits remain fixed.
+refunds; finite session/object/request limits still apply. Set `videoStreamCount`
+to configure 1–8 streams; [capacity and safe resizing](../docs/capacity.md) explains
+the separate quotas, quarantine and migration of an existing pool.
 
 Monthly budget alerts use a USD100 budget with actual USD10/25/50 and forecast
 USD75 notifications. Alerts and tag accounting can be delayed/incomplete; neither

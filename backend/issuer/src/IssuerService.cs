@@ -12,6 +12,14 @@ public interface IUploadSigner { Task<UploadGrant> SignAsync(StoredObject item, 
 public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve, IMediaIssuer media, IUploadSigner uploads,
     IssuerOptions options, TimeProvider clock)
 {
+    private async Task<Control> ReadControlAsync(CancellationToken ct)
+    {
+        var control = await store.GetControlAsync(ct);
+        // An existing CONTROL lease pool is migrated separately; changing a
+        // configuration file must not silently remove/reassign another lease.
+        if (control.State.Value.Slots.Length != options.StreamArns.Length) throw new IssuerError(503, "slot_configuration_mismatch");
+        return control;
+    }
     private DateTimeOffset Now => clock.GetUtcNow();
     private static IssuerError Busy() => new(429, "issuer_busy", 2);
     private static StartResult Result(SessionState s) => new(s.SessionId, s.Status, s.Generation, s.EndsAt,
@@ -24,7 +32,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         // session/tester references after separate session rows have expired by TTL.
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct);
+            var control = await ReadControlAsync(ct);
             var before = System.Text.Json.JsonSerializer.Serialize(control.State.Value, Wire.Json);
             control.State.Value.Reclaim(Now);
             if (before != System.Text.Json.JsonSerializer.Serialize(control.State.Value, Wire.Json)
@@ -42,7 +50,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         SessionState? claim = null;
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct); var global = control.State.Value; var now = Now;
+            var control = await ReadControlAsync(ct); var global = control.State.Value; var now = Now;
             global.Reclaim(now);
             var existing = await store.GetAsync<SessionState>(DbKey.Session(request.SessionId), ct);
             if (existing is not null)
@@ -103,7 +111,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         var testerHash = Wire.Hash(steamId);
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct); var global = control.State.Value; var now = Now;
+            var control = await ReadControlAsync(ct); var global = control.State.Value; var now = Now;
             global.Reclaim(now);
             var current = await store.GetAsync<SessionState>(DbKey.Session(claim.SessionId), ct) ?? throw new IssuerError(409, "stale_admission");
             var s = current.Value;
@@ -146,7 +154,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
     {
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct); var current = await store.GetAsync<SessionState>(DbKey.Session(claim.SessionId), ct);
+            var control = await ReadControlAsync(ct); var current = await store.GetAsync<SessionState>(DbKey.Session(claim.SessionId), ct);
             if (current?.Value is not { Status: "pending" } s || s.Generation != claim.Generation) return;
             s.ReservationUntil = Now;
             if (terminal) s.Status = "failed";
@@ -177,7 +185,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         request.Validate(); SessionState? reserved = null; StoredObject[] objects = []; var issueMedia = false;
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct); control.State.Value.Reclaim(Now);
+            var control = await ReadControlAsync(ct); control.State.Value.Reclaim(Now);
             var current = await store.GetAsync<SessionState>(DbKey.Session(id), ct) ?? throw new IssuerError(401, "invalid_session_proof");
             var s = current.Value; var now = Now; var active = Authenticate(control, s, proof, now); var global = control.State.Value;
             var minute = now.ToUnixTimeSeconds() / 60;
@@ -266,7 +274,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         // transaction durably advances the stream's maximum credential-expiry quarantine.
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct); control.State.Value.Reclaim(Now);
+            var control = await ReadControlAsync(ct); control.State.Value.Reclaim(Now);
             var current = await store.GetAsync<SessionState>(DbKey.Session(id), ct) ?? throw new IssuerError(410, "session_ended");
             var s = current.Value; Authenticate(control, s, proof, Now);
             if (s.AdmissionId != reserved.AdmissionId || s.SlotGeneration != reserved.SlotGeneration) throw new IssuerError(410, "lease_ended");
@@ -303,7 +311,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
         request.Validate();
         for (var retry = 0; retry < 8; retry++)
         {
-            var control = await store.GetControlAsync(ct); var current = await store.GetAsync<SessionState>(DbKey.Session(id), ct);
+            var control = await ReadControlAsync(ct); var current = await store.GetAsync<SessionState>(DbKey.Session(id), ct);
             if (current is null || !Wire.ValidProof(proof) || !Wire.SameProof(proof, current.Value.ProofHash)) throw new IssuerError(401, "invalid_session_proof");
             var s = current.Value;
             if (s.Status == "closed") return new { sessionId = id, state = "closed" };

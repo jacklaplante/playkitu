@@ -8,6 +8,22 @@ namespace Issuer.Tests;
 [TestFixture]
 public sealed class DeploymentTests
 {
+    [TestCase(1)] [TestCase(8)]
+    public async Task ConfiguredPoolSizeIsAcceptedAndMismatchedLiveLeasesFailClosed(int count)
+    {
+        var options = DeploymentFixture.Create(streams: count); options.Validate();
+        var f = new Fixture(options);
+        // The memory adapter exposes the real CONTROL marshaller/commit path.
+        var control = await f.Store.GetControlAsync(default);
+        control.State.Value.Slots = Enumerable.Range(0, count).Select(_ => new StreamSlot()).ToArray();
+        Assert.That(await f.Store.CommitAsync([f.Store.WriteControl(control)], default), Is.True);
+        Assert.That(await f.Service.ConfigAsync(default), Is.Not.Null);
+        control = await f.Store.GetControlAsync(default);
+        control.State.Value.Slots = Enumerable.Range(0, count == 1 ? 2 : 4).Select(_ => new StreamSlot()).ToArray();
+        Assert.That(await f.Store.CommitAsync([f.Store.WriteControl(control)], default), Is.True);
+        try { await f.Service.ConfigAsync(default); Assert.Fail("Mismatched pool accepted"); }
+        catch (IssuerError error) { Assert.That(error.Code, Is.EqualTo("slot_configuration_mismatch")); }
+    }
     [TestCase("123456789012", "us-east-2", 123456)]
     [TestCase("210987654321", "eu-west-1", 654321)]
     public void TwoIndependentDeploymentsRetainExactTrust(string account, string region, int app)

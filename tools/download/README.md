@@ -1,6 +1,49 @@
 # Playkitu owner download tool
 
 Read-only AWS catalogue/media retrieval plus offline inspection and log navigation.
+
+## Playtest library — list, select, watch
+
+The local browser app lists individual sessions by admission date, lets you select
+a playtest, and downloads its video/audio and diagnostic evidence. MP4 previews
+play in the browser, with an original MKV download and an Open download folder
+button. Downloaded sessions remain available after restarting the app. Microphone
+audio, when recorded, is part of the same audio track.
+
+After preparing the tool and owner configuration below, run:
+
+```powershell
+pwsh -NoProfile -File tools/download/browse.ps1 -Deployment C:/absolute/owner-download.json -Profile OWNER_PROCESS_PROFILE
+```
+
+The app opens in your browser. Select dates (up to 31 days), choose a session,
+then **Download recording**. It reads metadata pages and selects media windows
+automatically; no producer timestamps or AWS console stream selection are needed.
+Only one download runs at a time, with progress and cancellation. The default
+destination is `tools/download/private/library`; `-Output ABSOLUTE_DIRECTORY`
+changes it. `-NoOpen` prints the URL without opening a browser.
+
+Playback uses the native runtime plus the pinned GStreamer developer cache from
+`native/prepare.ps1`. The small game runtime intentionally omits MP4 muxing; the
+app does not modify it. `-NativeRuntime ABSOLUTE_DIRECTORY` selects the native
+probe/runtime. If preview conversion fails, the original MKV is still available
+for a player such as VLC. No FFmpeg installation is required.
+
+The server listens only on 127.0.0.1 with a fresh private URL, rejects cross-site
+requests and never sends AWS credentials to the page. Close its terminal to stop
+it. AWS login expiry requires ordinary sign-in and restarting the app, not new
+permissions. Browser access never changes recording controls or cloud resources.
+
+Sessions are read from the retained day index; expired/stale index entries are
+skipped. Fifty results per day is the display bound (above the supplied eight/day
+admission limit); reaching it shows an explicit truncation notice. Live sessions
+are partial observations. Video is kept in separately playable parts, preserving
+missing-footage warnings rather than silently stitching gaps. A whole download
+is bounded to two hours, 16 GiB of media-window transfers, and 64 ten-minute
+producer windows; metadata and individual windows retain the existing bounds.
+
+## Low-level retrieval and evidence
+
 It preserves original compressed objects, hashes, receipts, timing claims, MKVs,
 probe results and missing-data status. It does not remux, repair gaps, infer
 physical capture accuracy or call incomplete recordings complete.
@@ -31,7 +74,7 @@ The decoder subprocess receives no AWS configuration or credentials.
 After the separately approved infrastructure deployment, save the NONSECRET output
 using `terraform -chdir=infra/runtime output -json download_configuration` into an
 ignored private JSON file. Review it against the owner's chosen account, region,
-app, exact API origin, role, bucket, table and four streams. Never derive trust from
+app, exact API origin, role, bucket, table and configured streams. Never derive trust from
 a session/manifest/API response. `deployment.example.json` contains fake values
 only and is never automatically loaded.
 

@@ -76,7 +76,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "recording" {
 }
 
 resource "aws_kinesis_video_stream" "slot" {
-  for_each                = toset(["01", "02", "03", "04"])
+  for_each                = toset([for i in range(local.c.video_stream_count) : format("%02d", i + 1)])
   name                    = "${local.c.project}-slot-${each.key}"
   data_retention_in_hours = 720
   media_type              = "video/h264"

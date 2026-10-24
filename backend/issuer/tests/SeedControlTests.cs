@@ -4,6 +4,19 @@ namespace Issuer.Tests;
 [TestFixture]
 public sealed class SeedControlTests
 {
+    [TestCase(1)] [TestCase(8)]
+    public void SeedUsesConfiguredStreamCountWithoutEnablingRecording(int count)
+    {
+        using var output = new StringWriter(); var before = Console.Out;
+        try { Console.SetOut(output); Assert.That(Playkitu.Issuer.Program.Main(["--seed-control", "--video-streams", count.ToString()]), Is.Zero); }
+        finally { Console.SetOut(before); }
+        using var doc = JsonDocument.Parse(output.ToString());
+        using var state = JsonDocument.Parse(doc.RootElement.GetProperty("data").GetProperty("S").GetString()!);
+        Assert.That(state.RootElement.GetProperty("slots").GetArrayLength(), Is.EqualTo(count));
+        Assert.That(doc.RootElement.GetProperty("admissionsEnabled").GetProperty("BOOL").GetBoolean(), Is.False);
+    }
+    [TestCase("0")] [TestCase("9")] [TestCase("1.5")]
+    public void RejectsInvalidPoolSize(string count) => Assert.That(Playkitu.Issuer.Program.Main(["--seed-control", "--video-streams", count]), Is.EqualTo(2));
     [Test] public void OfflineSeedRetainsDynamoTypeCasingAndCanonicalOffState()
     {
         using var output = new StringWriter(); var before = Console.Out;

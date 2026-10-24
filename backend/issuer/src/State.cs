@@ -4,7 +4,7 @@ public sealed class GlobalState
 {
     public Dictionary<Guid, PendingReference> Pending { get; set; } = [];
     public Dictionary<Guid, ActiveReference> Active { get; set; } = [];
-    public StreamSlot[] Slots { get; set; } = [new(), new(), new(), new()];
+    public StreamSlot[] Slots { get; set; } = Enumerable.Range(0, Deployment.DefaultVideoStreams).Select(_ => new StreamSlot()).ToArray();
     public string Day { get; set; } = "";
     public string Month { get; set; } = "";
     public int DailyAdmissions { get; set; }

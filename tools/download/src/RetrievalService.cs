@@ -53,7 +53,7 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
     public static void ValidateSession(Guid id, SessionState s)
     {
         if (id == Guid.Empty || s.SessionId != id || s.AdmittedAt is null || s.AdmittedAt.Value.Offset != TimeSpan.Zero
-            || s.Generation is < 1 or > 3 || !Guid.TryParseExact(s.AdmissionId, "N", out _) || s.Slot is < -1 or > 3)
+            || s.Generation is < 1 or > 3 || !Guid.TryParseExact(s.AdmissionId, "N", out _) || s.Slot < -1 || s.Slot >= Deployment.MaxVideoStreams)
             throw new RetrievalError("invalid_session_metadata");
     }
     public async Task<RetrievalBundle> FetchAsync(Guid id, string output, CancellationToken ct, ProducerWindow? window = null, bool metadataOnly = false)

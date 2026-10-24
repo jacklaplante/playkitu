@@ -13,6 +13,9 @@ $env:AWS_ENDPOINT_URL='http://127.0.0.1:9'
 $c=Get-Content "$PSScriptRoot/deployment.example.json" -Raw | ConvertFrom-Json -AsHashtable
 $c.awsAccountId='210987654321';$c.awsRegion='eu-west-1';$c.steamAppId=654321
 $c | ConvertTo-Json | Set-Content "$evidence/deployment-second.json"
+$eight=Get-Content "$PSScriptRoot/deployment.example.json" -Raw|ConvertFrom-Json -AsHashtable
+$eight.videoStreamCount=8
+$eight|ConvertTo-Json|Set-Content "$evidence/deployment-eight.json"
 & $tf fmt -check -recursive $PSScriptRoot
 if($LASTEXITCODE){throw 'Terraform format check failed.'}
 foreach($root in 'foundation','bootstrap','runtime'){
@@ -42,6 +45,13 @@ $fixture=Get-Content "$PSScriptRoot/deployment.example.json" -Raw | ConvertFrom-
 $fixture.awsAccountId='bad';$fixture | ConvertTo-Json | Set-Content "$evidence/invalid.json"
 $rejected=$false;try{Read-InfrastructureConfiguration "$evidence/invalid.json"}catch{$rejected=$true}
 if(!$rejected){throw 'Owner settings trust rejection failed.'}
+foreach($count in @(0,9,1.5,'4',$true)){
+ $invalidPool=Get-Content "$PSScriptRoot/deployment.example.json" -Raw|ConvertFrom-Json -AsHashtable
+ $invalidPool.videoStreamCount=$count;$invalidPool|ConvertTo-Json|Set-Content "$evidence/invalid-pool.json"
+ $rejected=$false;try{Read-InfrastructureConfiguration "$evidence/invalid-pool.json"|Out-Null}catch{$rejected=$true}
+ if(!$rejected){throw 'Invalid video stream count accepted.'}
+}
+if((Read-InfrastructureConfiguration "$evidence/deployment-eight.json").video_stream_count -ne 8){throw 'Configured video pool mismatch.'}
 @{Passed=$true;MockProviderOnly=$true;NoAwsCalls=$true;ControlSeedOff=$true;Evidence=$evidence} | ConvertTo-Json | Set-Content "$evidence/result.json"
 & pwsh -NoProfile -File "$PSScriptRoot/access/test-operations.ps1" *> "$evidence/operations-test.log"
 if($LASTEXITCODE){Get-Content "$evidence/operations-test.log";throw 'Offline operation guards failed.'}

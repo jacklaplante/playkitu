@@ -21,6 +21,7 @@ playkitu helps developers see their game through a playtester's eyes. Players co
 - **Optional commentary:** separate microphone consent and an immediate Microphone Off control.
 - **Continuous upload:** retain footage already uploaded if the game later quits or crashes.
 - **Matching diagnostics:** bounded logs and timing metadata for locating relevant footage.
+- **Playtest library:** browse individual sessions, download recordings and watch video/audio in a local browser app.
 - **Your own backend:** Terraform, Steam verification, private storage and operational controls.
 - **A removable package:** game-specific menus, authentication ownership and lifecycle stay in your adapter.
 
@@ -63,6 +64,16 @@ https://github.com/jacklaplante/playkitu.git?path=/packages/com.playkitu.recordi
 
 ## How it works
 
+### Browse your playtests
+
+The [local playtest library](tools/download/README.md) lists individual sessions,
+downloads their recordings and plays video/audio in your browser. You use your
+own AWS login; the library never enables capture or changes cloud resources.
+
+![playkitu library with a generated sample recording](docs/assets/library-preview.png)
+
+*Library preview using a generated sample, not a tester's recording.*
+
 Upgrading from playreel? See the [rename and compatibility notes](docs/renaming.md).
 
 ~~~mermaid
@@ -101,6 +112,9 @@ Capture is limited to the game view, game audio, an explicitly enabled microphon
 AWS infrastructure, storage, traffic and retrieval incur charges in **your** account. Conservative quotas and spending/error alerts are supplied. Alerts are delayed notifications, not hard billing caps. See [costs and controls](infra/README.md#fixed-architecture-and-limits).
 
 Uninstalling client code does not delete retained recordings or paid infrastructure. [Removal instructions](docs/unity-integration.md#removing-playkitu) distinguish those operations.
+
+The shared video pool defaults to four streams. Its size is configured with
+`videoStreamCount`; see [capacity and safe resizing](docs/capacity.md).
 
 ## Repository
 

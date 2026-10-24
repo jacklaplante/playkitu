@@ -7,6 +7,7 @@ namespace Playkitu.Issuer;
 // player request, downloaded manifest, environment endpoint override or ARN discovery.
 public class Deployment
 {
+    public const int DefaultVideoStreams = 4, MaxVideoStreams = 8;
     public string AwsAccountId { get; init; } = "";
     public string AwsRegion { get; init; } = "";
     public int SteamAppId { get; init; }
@@ -40,7 +41,7 @@ public class Deployment
         var role = $"arn:aws:iam::{AwsAccountId}:role{RolePath}{Project}-";
         if (MediaRoleArn != role + "media" || RetrievalRoleArn != role + "retrieval"
             || !Match(PublisherSecretArn, $"arn:aws:secretsmanager:{Regex.Escape(AwsRegion)}:{AwsAccountId}:secret:{Regex.Escape(Project)}/publisher-key-[A-Za-z0-9]{{6}}")
-            || StreamArns.Length != 4 || StreamArns.Distinct().Count() != 4
+            || StreamArns.Length is < 1 or > MaxVideoStreams || StreamArns.Distinct().Count() != StreamArns.Length
             || StreamArns.Where((arn, i) => !Match(arn, $"arn:aws:kinesisvideo:{Regex.Escape(AwsRegion)}:{AwsAccountId}:stream/{Regex.Escape(StreamNamePrefix)}{i + 1:D2}/[0-9]+")).Any())
             throw new InvalidOperationException("Deployment resources must match owner trust.");
     }

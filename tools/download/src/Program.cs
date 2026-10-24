@@ -16,11 +16,12 @@ public static class Program
     {
         try
         {
-            if (args.Length == 0 || args[0] is not ("list" or "fetch" or "metadata" or "inspect" or "map" or "locate-log")) throw new RetrievalError("usage_list_fetch_metadata_inspect_map_locate_log");
+            if (args.Length == 0 || args[0] is not ("browse" or "list" or "fetch" or "metadata" or "inspect" or "map" or "locate-log")) throw new RetrievalError("usage_browse_list_fetch_metadata_inspect_map_locate_log");
             var options = new Dictionary<string, string>(StringComparer.Ordinal);
             for (var i = 1; i < args.Length; i += 2)
                 if (i + 1 >= args.Length || !args[i].StartsWith("--", StringComparison.Ordinal) || !options.TryAdd(args[i], args[i + 1])) throw new RetrievalError("invalid_arguments");
             var allowed = args[0] switch {
+                "browse" => new[] { "--profile", "--deployment", "--output", "--tool-root", "--native-runtime", "--no-open" },
                 "list" => new[] { "--day", "--profile", "--deployment", "--limit", "--tool-root", "--native-runtime" },
                 "fetch" => new[] { "--session", "--profile", "--deployment", "--output", "--tool-root", "--native-runtime", "--metadata-page", "--producer-from-utc", "--producer-to-utc" },
                 "metadata" => new[] { "--session", "--profile", "--deployment", "--output", "--tool-root", "--native-runtime", "--previous-page" },
@@ -35,6 +36,16 @@ public static class Program
             if (nativeRuntime is not null && (!Path.IsPathFullyQualified(nativeRuntime)
                 || !File.Exists(Path.Combine(nativeRuntime, "bin", "native-media-probe.exe"))))
                 throw new RetrievalError("invalid_native_runtime");
+            if (args[0] == "browse") {
+                var output = Required("--output");
+                if (!Path.IsPathFullyQualified(output)) throw new RetrievalError("absolute_library_directory_required");
+                using var verification = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                using var owner = await OwnerConnection.OpenAsync(Required("--profile"), Deployment.Load(Required("--deployment")), verification.Token);
+                var tool = Required("--tool-root");
+                await LibraryBrowser.RunAsync(new PlaytestLibrary(owner.Store, new ProbeProcess(tool, nativeRuntime),
+                    new PlaybackConverter(tool, nativeRuntime)), output, options.GetValueOrDefault("--no-open") != "true", CancellationToken.None);
+                return 0;
+            }
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(300));
             var ct = deadline.Token;
             if (args[0] == "locate-log")
@@ -73,15 +84,8 @@ public static class Program
                 }
             }
             var deployment = Deployment.Load(Required("--deployment"));
-            var credentials = OwnerProfile.Load(Required("--profile"));
-            var region = RegionEndpoint.GetBySystemName(deployment.AwsRegion); var http = new BoundedHttpFactory();
-            using var sts = new AmazonSecurityTokenServiceClient(credentials, new AmazonSecurityTokenServiceConfig { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true, HttpClientFactory = http });
-            await OwnerProfile.VerifyAsync(sts, deployment, ct);
-            using var dynamo = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true, HttpClientFactory = http });
-            using var s3 = new AmazonS3Client(credentials, new AmazonS3Config { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true, HttpClientFactory = http });
-            using var video = new AmazonKinesisVideoClient(credentials, new AmazonKinesisVideoConfig { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true, HttpClientFactory = http });
-            var store = new AwsReadStore(dynamo, s3, video, endpoint => new AmazonKinesisVideoArchivedMediaClient(credentials,
-                new() { ServiceURL = endpoint, AuthenticationRegion = deployment.AwsRegion, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true, HttpClientFactory = http }), deployment);
+            using var connection = await OwnerConnection.OpenAsync(Required("--profile"), deployment, ct);
+            var store = connection.Store;
             var service = new RetrievalService(store, new ProbeProcess(options.GetValueOrDefault("--tool-root") ?? AppContext.BaseDirectory, nativeRuntime));
             if (args[0] == "list") { Print(new { sessions = await service.ListAsync(day, count, ct), limit = count, indexConsistency = "eventual" }); return 0; }
             if (args[0] == "metadata") {
