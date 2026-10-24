@@ -47,7 +47,9 @@ locals {
   media_statements = [{ Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:GetDataEndpoint", "kinesisvideo:PutMedia"], Resource = local.readable_streams }]
   deploy_statements = [
     local.signin,
-    { Sid = "FunctionOnly", Effect = "Allow", Action = ["lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:GetFunctionCodeSigningConfig", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:PutFunctionConcurrency", "lambda:GetFunctionConcurrency", "lambda:ListTags", "lambda:TagResource", "lambda:UntagResource", "lambda:ListVersionsByFunction", "lambda:GetRuntimeManagementConfig"], Resource = local.function_arn },
+    # AWS removes a reserved concurrency limit with DeleteFunctionConcurrency;
+    # this does not grant DeleteFunction or affect other functions.
+    { Sid = "FunctionOnly", Effect = "Allow", Action = ["lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:GetFunctionCodeSigningConfig", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:PutFunctionConcurrency", "lambda:GetFunctionConcurrency", "lambda:DeleteFunctionConcurrency", "lambda:ListTags", "lambda:TagResource", "lambda:UntagResource", "lambda:ListVersionsByFunction", "lambda:GetRuntimeManagementConfig"], Resource = local.function_arn },
     { Sid = "PassIssuerOnly", Effect = "Allow", Action = ["iam:PassRole"], Resource = local.roles.issuer, Condition = { StringEquals = { "iam:PassedToService" = "lambda.amazonaws.com" } } },
     # Foundation creates the API shell so deploy never needs POST /apis or access to other APIs.
     { Sid = "ExistingApiRead", Effect = "Allow", Action = ["apigateway:GET"], Resource = "arn:aws:apigateway:${local.c.region}::/apis/${var.api_id}" },

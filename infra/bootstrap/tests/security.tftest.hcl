@@ -94,8 +94,14 @@ run "owner_storage_and_boundaries" {
     error_message = "Runtime must use independent GetItem and transaction-restricted PutItem."
   }
   assert {
-    condition     = alltrue([for s in jsondecode(aws_iam_role_policy.project["deploy"].policy).Statement : alltrue([for a in s.Action : !startswith(a, "iam:") || a == "iam:PassRole"])]) && !strcontains(aws_iam_role_policy.project["deploy"].policy, "secretsmanager:") && !strcontains(aws_iam_role_policy.project["deploy"].policy, "lambda:AddPermission") && !strcontains(aws_iam_role_policy.project["deploy"].policy, "DeleteFunction")
+    condition     = alltrue([for s in jsondecode(aws_iam_role_policy.project["deploy"].policy).Statement : alltrue([for a in s.Action : (!startswith(a, "iam:") || a == "iam:PassRole") && a != "lambda:DeleteFunction"])]) && !strcontains(aws_iam_role_policy.project["deploy"].policy, "secretsmanager:") && !strcontains(aws_iam_role_policy.project["deploy"].policy, "lambda:AddPermission")
     error_message = "Routine deploy authority must not expand permissions/read secrets/delete retained services."
+  }
+  assert {
+    condition = alltrue([for s in jsondecode(aws_iam_role_policy.project["deploy"].policy).Statement :
+      !contains(s.Action, "lambda:DeleteFunctionConcurrency") ? true : s.Resource == local.function_arn
+    ]) && anytrue([for s in jsondecode(aws_iam_role_policy.project["deploy"].policy).Statement : contains(s.Action, "lambda:DeleteFunctionConcurrency")])
+    error_message = "Removing reserved concurrency must work for this function only, without permission to delete the service."
   }
   assert {
     condition     = length(aws_lambda_permission.api) == 0 && length(aws_lambda_permission.cleanup) == 0 && aws_cloudwatch_event_rule.cleanup.state == "DISABLED" && length(aws_cloudwatch_event_target.cleanup) == 0

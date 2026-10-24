@@ -41,6 +41,9 @@ $seed=Get-Content "$owner/controls/control-seed.json" -Raw | ConvertFrom-Json -A
 if($seed.Item.admissionsEnabled.BOOL -or $seed.Item.uploadsEnabled.BOOL -or ($seed.Item.data.S | ConvertFrom-Json).slots.Count -ne 4 -or $seed.ConditionExpression -ne 'attribute_not_exists(#pk)'){throw 'Canonical OFF seed protections changed.'}
 $deploy=Get-Content "$PSScriptRoot/bootstrap/iam.tf" -Raw
 if($deploy -match 'secretsmanager:PutSecretValue|AdministratorAccess'){throw 'Routine role authority expanded.'}
+$ownerBoundary=Get-Content "$owner/boundary.json" -Raw|ConvertFrom-Json -AsHashtable
+$concurrency=@($ownerBoundary.Statement|Where-Object {'lambda:DeleteFunctionConcurrency'-in$_.Action})
+if($concurrency.Count-ne 1-or$concurrency[0].Resource-ne"arn:aws:lambda:$($settings.region):$($settings.account):function:$($settings.function)"-or@($ownerBoundary.Statement|Where-Object {'lambda:DeleteFunction'-in$_.Action}).Count-ne 0){throw 'Owner boundary must allow removing only the named function concurrency limit, not deleting the function.'}
 $fixture=Get-Content "$PSScriptRoot/deployment.example.json" -Raw | ConvertFrom-Json -AsHashtable
 $fixture.awsAccountId='bad';$fixture | ConvertTo-Json | Set-Content "$evidence/invalid.json"
 $rejected=$false;try{Read-InfrastructureConfiguration "$evidence/invalid.json"}catch{$rejected=$true}

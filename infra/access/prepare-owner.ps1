@@ -103,7 +103,9 @@ $taskBoundary = @(
     @{Effect='Allow';Action=@('secretsmanager:GetSecretValue');Resource=$taskSecret},
     @{Effect='Allow';Action=@('sts:AssumeRole');Resource=$taskMedia},
     @{Effect='Allow';Action=@('logs:CreateLogStream','logs:PutLogEvents');Resource=@($taskLogs | ForEach-Object { "${_}:log-stream:*" })},
-    @{Effect='Allow';Action=@('lambda:CreateFunction','lambda:GetFunction','lambda:GetFunctionConfiguration','lambda:GetFunctionCodeSigningConfig','lambda:UpdateFunctionCode','lambda:UpdateFunctionConfiguration','lambda:PutFunctionConcurrency','lambda:GetFunctionConcurrency','lambda:ListTags','lambda:TagResource','lambda:UntagResource','lambda:ListVersionsByFunction','lambda:GetRuntimeManagementConfig');Resource=$taskFunction},
+    # Returning to the account's shared concurrency uses DeleteFunctionConcurrency,
+    # not PutFunctionConcurrency. This removes a limit, never the function itself.
+    @{Effect='Allow';Action=@('lambda:CreateFunction','lambda:GetFunction','lambda:GetFunctionConfiguration','lambda:GetFunctionCodeSigningConfig','lambda:UpdateFunctionCode','lambda:UpdateFunctionConfiguration','lambda:PutFunctionConcurrency','lambda:GetFunctionConcurrency','lambda:DeleteFunctionConcurrency','lambda:ListTags','lambda:TagResource','lambda:UntagResource','lambda:ListVersionsByFunction','lambda:GetRuntimeManagementConfig');Resource=$taskFunction},
     @{Effect='Allow';Action=@('iam:PassRole');Resource=$taskIssuer;Condition=@{StringEquals=@{'iam:PassedToService'='lambda.amazonaws.com'}}},
     @{Effect='Allow';Action=@('apigateway:GET','apigateway:POST','apigateway:PATCH','apigateway:DELETE');Resource=@($taskApi,"$taskApi/*",$taskApiTags,"${taskApiTags}%2F*")}
 )
