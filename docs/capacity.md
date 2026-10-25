@@ -119,4 +119,4 @@ installation only; it cannot migrate an existing CONTROL item.
    retrieval/retirement check before reopening admissions. Do not treat offline
    tests as actual AWS throughput, deployment or capture evidence.
 
-No existing AWS installation was migrated or resized by implementing this source.
+Updating this source alone never migrates or resizes an existing AWS installation.
