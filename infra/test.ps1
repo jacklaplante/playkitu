@@ -70,6 +70,8 @@ $boundary=Get-Content "$onDemandOwner/boundary.json" -Raw|ConvertFrom-Json -AsHa
 $create=@($boundary.Statement|Where-Object {'kinesisvideo:CreateStream'-in$_.Action})
 $delete=@($boundary.Statement|Where-Object {'kinesisvideo:DeleteStream'-in$_.Action})
 if($create.Count-ne 1-or$delete.Count-ne 1-or$create[0].Condition.StringEquals.'aws:RequestTag/Project'-ne$onDemand.project-or$delete[0].Condition.StringEquals.'aws:ResourceTag/Project'-ne$onDemand.project-or$create[0].Resource-notlike'*session-*'){throw 'On-demand boundary lost namespace/tag guards.'}
+$tag=@($boundary.Statement|Where-Object {'kinesisvideo:TagStream'-in$_.Action})
+if($tag.Count-ne1-or$tag[0].Resource-cne("arn:aws:kinesisvideo:$($onDemand.region):$($onDemand.account):stream/$($onDemand.stream_name_prefix)session-"+'${aws:RequestTag/Admission}/*')-or$tag[0].Condition.StringEquals.'aws:RequestTag/Project'-cne$onDemand.project-or$tag[0].Condition.StringEquals.'aws:RequestTag/ManagedBy'-cne'playkitu'){throw 'Tag-on-create must preserve exact stream/admission ownership.'}
 foreach($case in @(@{concurrentSessions=0},@{admissionsPerDay=-1},@{admissionsPerMonth='50'},@{testerAdmissionsPerDay=$true},@{admissionAttemptsPerMinute=$null},@{sessionRequestsPerMinute=121},@{unexpected=1})){
  $invalid=Get-Content $onDemandFile -Raw|ConvertFrom-Json -AsHashtable
  $invalid.recordingLimits=$case

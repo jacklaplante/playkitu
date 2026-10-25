@@ -36,6 +36,9 @@ admission. One active/preparing session per tester remains an ownership rule.
 Settings are deployment configuration: change them, review the Terraform plan and
 deploy. They are not hardcoded product quotas or a tester-controlled API. Enabling
 or lowering a cap does not terminate existing sessions; it restricts new admissions.
+The historical `Get-PlaykituAllowance` helper is pooled-only and refuses on-demand
+configuration; its old CONTROL maps cannot measure the new scalar usage counters.
+Read `/v1/config` for effective deployed limits, rather than assuming 8/day or 50/month.
 After a crash, an optional concurrency cap is released by scheduled lease cleanup;
 backlog/failure can delay that release. Explicit Close releases it immediately.
 
@@ -98,6 +101,9 @@ installation only; it cannot migrate an existing CONTROL item.
 3. Prepare/review new stream namespace/tag permissions, CONTROL transaction-fence
    permission, the due-work index, minute cleanup event, runtime settings and ZIP.
    No client gets creation or deletion authority. Review costs and actual quotas.
+   Tagged stream creation also authorizes `kinesisvideo:TagStream`; its policy
+   binds the request's Admission tag to the stream name and fixes both ownership
+   tags. Do not grant general retagging or omit that dependency.
 4. Prepare a conditional state migration from the strongly read old version/data
    and verified OFF/OFF flags. Preserve old daily/monthly/tester totals in the
    corresponding `USAGE#DAY#date`, `USAGE#MONTH#month`, `USAGE#TESTER#hash#date`

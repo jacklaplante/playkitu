@@ -44,6 +44,13 @@ run "on_demand_has_no_pool_and_only_scoped_stream_management" {
     error_message = "On-demand cleanup must use the private scheduled event every minute."
   }
   assert {
+    condition = anytrue([for statement in jsondecode(aws_iam_role_policy.project["issuer"].policy).Statement :
+      !contains(statement.Action, "kinesisvideo:TagStream") ? false :
+      (statement.Resource == "arn:aws:kinesisvideo:us-east-2:123456789012:stream/playkitu-slot-session-$${aws:RequestTag/Admission}/*" && statement.Condition.StringEquals["aws:RequestTag/Project"] == "playkitu" && statement.Condition.StringEquals["aws:RequestTag/ManagedBy"] == "playkitu")
+    ]) && alltrue([for name in ["media", "retrieval", "deploy", "operations"] : !strcontains(aws_iam_role_policy.project[name].policy, "kinesisvideo:TagStream")])
+    error_message = "Tag-on-create must bind the Admission tag to the exact stream name; only issuer may tag."
+  }
+  assert {
     condition = alltrue([for statement in jsondecode(aws_iam_role_policy.project["issuer"].policy).Statement :
       !contains(statement.Action, "kinesisvideo:CreateStream") ? true :
       (statement.Resource == local.session_streams && statement.Condition.StringEquals["aws:RequestTag/Project"] == "playkitu" && statement.Condition.StringEquals["aws:RequestTag/ManagedBy"] == "playkitu")

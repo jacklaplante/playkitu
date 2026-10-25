@@ -29,6 +29,13 @@ locals {
       StringLike                  = { "aws:RequestTag/Admission" = join("", [for i in range(32) : "?"]) },
       "ForAllValues:StringEquals" = { "aws:TagKeys" = ["Project", "ManagedBy", "Admission"] }
     } },
+    # Tag-on-create is a separate authorization dependency. IAM substitutes the
+    # request's Admission tag into this ARN; existing streams cannot be relabeled.
+    { Sid = "TagMatchingAdmissionOnly", Effect = "Allow", Action = ["kinesisvideo:TagStream"], Resource = "arn:aws:kinesisvideo:${local.c.region}:${local.c.account}:stream/${local.c.stream_name_prefix}session-$${aws:RequestTag/Admission}/*", Condition = {
+      StringEquals                = { "aws:RequestTag/Project" = local.c.project, "aws:RequestTag/ManagedBy" = "playkitu" },
+      StringLike                  = { "aws:RequestTag/Admission" = join("", [for i in range(32) : "?"]) },
+      "ForAllValues:StringEquals" = { "aws:TagKeys" = ["Project", "ManagedBy", "Admission"] }
+    } },
     { Sid = "RetireOwnedAdmissionStream", Effect = "Allow", Action = ["kinesisvideo:DeleteStream"], Resource = local.session_streams, Condition = {
       StringEquals = { "aws:ResourceTag/Project" = local.c.project, "aws:ResourceTag/ManagedBy" = "playkitu" },
       StringLike   = { "aws:ResourceTag/Admission" = join("", [for i in range(32) : "?"]) }

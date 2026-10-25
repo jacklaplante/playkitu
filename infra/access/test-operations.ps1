@@ -47,6 +47,11 @@ Remove-Item Env:AWS_ENDPOINT_URL_STS
 $allowanceParameters=@{ConfigurationFile=$configuration;OperationsProfile='ops';DeployProfile='deploy';PlannedAdmissions=1;ReviewedIssuerSha256=('1'*64)}
 $a=Get-PlaykituAllowance @allowanceParameters
 Check 'finite conservative allowance' ($a.AllowanceAvailable -and $a.GlobalDailyRemaining -eq 6 -and $a.GlobalMonthlyRemaining -eq 38 -and $a.ConservativeTesterRemaining -eq 5)
+$onDemandParameters=$allowanceParameters.Clone()
+$onDemandParameters.ConfigurationFile=[IO.Path]::GetFullPath("$PSScriptRoot/../deployment.on-demand.example.json")
+$beforeOnDemand=$script:calls.Count
+Reject 'legacy allowance cannot invent on-demand quota remaining' {Get-PlaykituAllowance @onDemandParameters}
+Check 'on-demand legacy allowance rejection needs no AWS call' ($script:calls.Count-eq$beforeOnDemand)
 $script:daily=8;Check 'global daily ceiling' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:daily=2
 $script:monthly=50;Check 'global monthly ceiling' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:monthly=12
 $script:tester=8;Check 'tester ceiling' (!(Get-PlaykituAllowance @allowanceParameters).AllowanceAvailable);$script:tester=3

@@ -44,9 +44,13 @@ function Get-PlaykituAllowance {
     param([Parameter(Mandatory)][string]$ConfigurationFile,[Parameter(Mandatory)][string]$OperationsProfile,
         [Parameter(Mandatory)][string]$DeployProfile,[Parameter(Mandatory)][ValidateRange(1,8)][int]$PlannedAdmissions,
         [Parameter(Mandatory)][ValidatePattern('\A[a-fA-F0-9]{64}\z')][string]$ReviewedIssuerSha256)
+    $c=Read-InfrastructureConfiguration $ConfigurationFile
+    # On-demand admission counters are separate rows; legacy CONTROL maps are
+    # deliberately empty. Reading those maps would invent an 8/day, 50/month
+    # allowance even when the deployed count caps are disabled or different.
+    if($c.stream_mode-ceq'onDemand'){throw 'Get-PlaykituAllowance supports legacy pooled installations only. On-demand limits come from the reviewed deployment and /v1/config; never infer usage from CONTROL maps.'}
     Assert-PlaykituRole $ConfigurationFile $OperationsProfile operations
     Assert-PlaykituRole $ConfigurationFile $DeployProfile deploy
-    $c=Read-InfrastructureConfiguration $ConfigurationFile
     $code=& aws lambda get-function-configuration --function-name $c.function --profile $DeployProfile --region $c.region --query CodeSha256 --output text --cli-connect-timeout 5 --cli-read-timeout 10
     if($LASTEXITCODE){throw 'Reviewed issuer hash unavailable.'}
     $actual=[Convert]::ToHexString([Convert]::FromBase64String(($code -join '').Trim()))

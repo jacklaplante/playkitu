@@ -117,6 +117,12 @@ if($c.stream_mode-ceq'onDemand'){
         @{Effect='Allow';Action=@('kinesisvideo:CreateStream');Resource=$taskSessionStreams;Condition=@{
             StringEquals=@{'aws:RequestTag/Project'=$c.project;'aws:RequestTag/ManagedBy'='playkitu'};
             StringLike=@{'aws:RequestTag/Admission'=('?'*32)};'ForAllValues:StringEquals'=@{'aws:TagKeys'=@('Project','ManagedBy','Admission')}}},
+        # CreateStream with Tags authorizes TagStream too. Bind its Admission
+        # value to the resource name, so the service cannot relabel an existing
+        # stream as another admission or change either fixed ownership tag.
+        @{Effect='Allow';Action=@('kinesisvideo:TagStream');Resource=("arn:aws:kinesisvideo:${r}:${a}:stream/$($c.stream_name_prefix)session-"+'${aws:RequestTag/Admission}'+'/*');Condition=@{
+            StringEquals=@{'aws:RequestTag/Project'=$c.project;'aws:RequestTag/ManagedBy'='playkitu'};
+            StringLike=@{'aws:RequestTag/Admission'=('?'*32)};'ForAllValues:StringEquals'=@{'aws:TagKeys'=@('Project','ManagedBy','Admission')}}},
         @{Effect='Allow';Action=@('kinesisvideo:DeleteStream');Resource=$taskSessionStreams;Condition=@{
             StringEquals=@{'aws:ResourceTag/Project'=$c.project;'aws:ResourceTag/ManagedBy'='playkitu'};StringLike=@{'aws:ResourceTag/Admission'=('?'*32)}}}
     )
