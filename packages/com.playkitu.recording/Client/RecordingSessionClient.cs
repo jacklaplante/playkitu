@@ -29,6 +29,7 @@ namespace Playkitu.Client
         private DateTimeOffset consentUtc, endsAt;
         private DateTimeOffset? metadataUntil;
         private int metadataFinalizationSeconds;
+        private bool playerDisplayNames;
         private double metadataEnd;
         private double lastTick, admissionEnd, httpEnd, retryAt, heartbeatAt, refreshAt, mediaAttemptAt, mediaExpiresAt, sessionEnd, serverObservedAt;
         private DateTimeOffset serverUtc;
@@ -159,6 +160,9 @@ namespace Playkitu.Client
                 if (config == null) { StopUnavailable("issuer_unavailable"); yield break; }
                 ObserveServer(config);
                 if (!RecordingProtocol.Boolean(config, "enabled")) { StopUnavailable("recording_disabled"); yield break; }
+                // Old issuers reject unknown request members. Negotiate names before adding
+                // them to immutable admission data; older deployments keep recording normally.
+                playerDisplayNames = config["playerDisplayNames"] != null && RecordingProtocol.Boolean(config, "playerDisplayNames");
                 RecordingProtocol.Integer(config, "appId", Trust.SteamAppId, Trust.SteamAppId);
                 RecordingProtocol.Integer(config, "consentSchemaVersion", 1, 1);
                 if (RecordingProtocol.Text(config, "identityPrefix", 16) != Trust.IdentityPrefix) throw new RecordingFailure("invalid_response");
@@ -188,7 +192,7 @@ namespace Playkitu.Client
         }
         private IEnumerator SubmitAdmission(string hex, long seconds)
         {
-            byte[] body = RecordingProtocol.Encode(RecordingProtocol.Start(SessionId, proof, seconds, hex, build, microphone, consentUtc, metadataFinalizationSeconds));
+            byte[] body = RecordingProtocol.Encode(RecordingProtocol.Start(SessionId, proof, seconds, hex, build, microphone, consentUtc, metadataFinalizationSeconds, playerDisplayNames));
             // Keep this exact body and its ticket lease through pending/lost-response
             // recovery. A fresh ticket/time is acquired only for a fenced takeover.
             for (int poll = 0; poll < 24 && State == RecordingSessionState.Admitting; poll++)

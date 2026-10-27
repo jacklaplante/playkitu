@@ -51,6 +51,12 @@ and the [integration guide](unity-integration.md).
   retrieval login, .NET tooling and a built native probe. MP4 preview preparation
   also uses the pinned GStreamer developer cache. It is not a hosted team portal.
   Credentials expire and require ordinary sign-in again.
+- Player names require a host-provided name, updated client and an issuer advertising
+  playerDisplayNames. Existing anonymous recordings cannot recover old usernames;
+  local operator labels remain available. Names are display metadata, not identity
+  verification. Displayed session length is approximate
+  observed activity, not a promise of continuous or complete playable footage.
+  Log downloads preserve uploaded chunks and any missing-data notes.
 - Recordings play as separate MP4 parts. Originals and missing-data notes remain;
   there is no silently repaired continuous timeline. Log-to-video navigation is
   an estimate when evidence supports it, not guaranteed frame-accurate matching.

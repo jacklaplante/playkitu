@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.IO.Compression;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -36,6 +37,20 @@ public static class LibraryBrowser
     {
         if (!Path.IsPathFullyQualified(output)) throw new RetrievalError("absolute_library_directory_required");
         Directory.CreateDirectory(output);
+        // Optional operator labels remain in this private local library. The recording backend
+        // stores anonymous tester hashes, not usernames; never guess an identity from footage.
+        var namesFile = Path.Combine(output, "player-names.json");
+        var names = new ConcurrentDictionary<string, string>();
+        if (File.Exists(namesFile)) {
+            _ = RetrievalService.LocalFile(output, "player-names.json");
+            if (new FileInfo(namesFile).Length > RetrievalLimits.MiB) throw new RetrievalError("player_names_limit");
+            foreach (var pair in JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllBytes(namesFile), Wire.Json) ?? []) {
+                if (pair.Key.Length is not (32 or 64) || pair.Key.Any(c => !Uri.IsHexDigit(c))
+                    || pair.Value.Length > 80 || pair.Value.Any(char.IsControl)) throw new RetrievalError("invalid_player_name");
+                names[pair.Key] = pair.Value;
+            }
+        }
+        var namesGate = new SemaphoreSlim(1);
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0));
@@ -53,7 +68,8 @@ public static class LibraryBrowser
                 var manifest = RetrievalService.LocalFile(directory, "playtest.json");
                 if (new FileInfo(manifest).Length > 2 * RetrievalLimits.MiB) continue;
                 var result = JsonSerializer.Deserialize<PlaytestDownload>(File.ReadAllBytes(manifest), Wire.Json);
-                if (result is null || result.SessionId != session || result.Parts.Count > 4096) continue;
+                if (result is null || result.SessionId != session || result.Parts.Count > 4096 || result.Logs.Count > 8192) continue;
+                foreach (var log in result.Logs) _ = PlaytestLibrary.LogFile(directory, log.File);
                 foreach (var part in result.Parts) {
                     _ = PlaytestLibrary.PlaybackFile(directory, part.Original);
                     if (part.Preview is not null) _ = PlaytestLibrary.PlaybackFile(directory, part.Preview);
@@ -77,6 +93,7 @@ public static class LibraryBrowser
             try { await next(context); }
             catch (OperationCanceledException) { context.Response.StatusCode = 408; }
             catch (Exception error) {
+                if (context.Response.HasStarted) { context.Abort(); return; }
                 context.Response.StatusCode = 400;
                 await context.Response.WriteAsJsonAsync(new { error = error is RetrievalError r ? r.Code : "read_failed_check_owner_login" }, Wire.Json);
             }
@@ -90,15 +107,34 @@ public static class LibraryBrowser
                 || !DateOnly.TryParseExact(to, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var last))
                 throw new RetrievalError("invalid_day");
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel); deadline.CancelAfter(TimeSpan.FromMinutes(2));
-            return Results.Json(await library.ListAsync(first, last, deadline.Token, cursor), Wire.Json);
+            var listing = await library.ListAsync(first, last, deadline.Token, cursor);
+            return Results.Json(listing with { Sessions = listing.Sessions.Select(s =>
+                s with { PlayerName = s.PlayerName ?? names.GetValueOrDefault(s.PlayerKey) }).ToArray() }, Wire.Json);
         });
-        app.MapPost(token + "/download/{session:guid}", async (Guid session) => {
+        app.MapPost(token + "/player-name/{session:guid}", async (Guid session, HttpContext context) => {
+            if (context.Request.ContentLength is null or > 1024) return Results.BadRequest();
+            var name = (await context.Request.ReadFromJsonAsync<string>(Wire.Json))?.Trim();
+            if (name is null || name.Length > 80 || name.Any(char.IsControl)) return Results.BadRequest();
+            var key = await library.PlayerKeyAsync(session, context.RequestAborted);
+            await namesGate.WaitAsync(context.RequestAborted);
+            try {
+                if (names.Count >= 5000 && !names.ContainsKey(key)) throw new RetrievalError("player_names_limit");
+                var updated = names.ToDictionary();
+                if (name.Length == 0) updated.Remove(key); else updated[key] = name;
+                var temporary = namesFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(updated, Wire.Json), context.RequestAborted);
+                File.Move(temporary, namesFile, overwrite: true);
+                if (name.Length == 0) names.TryRemove(key, out _); else names[key] = name;
+            } finally { namesGate.Release(); }
+            return Results.Ok();
+        });
+        app.MapPost(token + "/download/{session:guid}", async (Guid session, bool? logsOnly) => {
             if (session == Guid.Empty) return Results.BadRequest();
             if (!await gate.WaitAsync(0)) return Results.Conflict(new { error = "one_download_at_a_time" });
             var id = Guid.NewGuid(); var directory = Path.Combine(output, $"{session:N}-{id:N}");
             var job = new LibraryJob(id, session, directory); jobs[id] = job;
             job.Work = Task.Run(async () => {
-                try { job.Result = await library.DownloadAsync(session, directory, text => job.Progress = text, job.Cancel.Token); }
+                try { job.Result = await library.DownloadAsync(session, directory, text => job.Progress = text, job.Cancel.Token, includeVideo: logsOnly != true); }
                 catch { job.Result = new() { SessionId = session, Status = "incomplete", Issues = ["download_failed"] }; }
                 finally { job.Progress = job.Result?.Status ?? "incomplete"; gate.Release(); }
             }, CancellationToken.None);
@@ -112,6 +148,33 @@ public static class LibraryBrowser
         app.MapPost(token + "/folder/{id:guid}", (Guid id) => {
             if (!jobs.TryGetValue(id, out var job) || !Directory.Exists(job.Directory)) return Results.NotFound();
             Process.Start(new ProcessStartInfo(job.Directory) { UseShellExecute = true }); return Results.Ok();
+        });
+        app.MapGet(token + "/logs/{id:guid}", async (Guid id) => {
+            if (!jobs.TryGetValue(id, out var job) || job.Result is null || job.Result.Logs.Count == 0)
+                return Results.NotFound();
+            // ZIP entry finalization can write synchronously even after OpenAsync. Spool to a
+            // private temporary file, then stream asynchronously to Kestrel. DeleteOnClose
+            // removes the archive on completion/disconnect without buffering all logs in RAM.
+            var archive = new FileStream(Path.Combine(job.Directory, Guid.NewGuid().ToString("N") + ".zip"),
+                FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 65536,
+                FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+            try {
+              using (var zip = new ZipArchive(archive, ZipArchiveMode.Create, leaveOpen: true)) {
+                foreach (var log in job.Result.Logs.OrderBy(l => l.Sequence)) {
+                    var file = PlaytestLibrary.LogFile(job.Directory, log.File);
+                    var entry = zip.CreateEntry($"logs-{log.Sequence:D6}.log");
+                    await using var source = File.OpenRead(file);
+                    await using var target = entry.Open();
+                    await source.CopyToAsync(target);
+                }
+                var notes = zip.CreateEntry("download-notes.txt");
+                await using var writer = new StreamWriter(notes.Open());
+                await writer.WriteAsync("Uploaded log chunks; missing records are not reconstructed.\n"
+                    + string.Join("\n", job.Result.Issues));
+              }
+              archive.Position = 0;
+              return Results.Stream(archive, "application/zip", $"playtest-{job.SessionId:N}-logs.zip");
+            } catch { await archive.DisposeAsync(); throw; }
         });
         app.MapGet(token + "/media/{id:guid}/{part:int}/{kind}", (Guid id, int part, string kind, HttpContext context) => {
             if (!jobs.TryGetValue(id, out var job) || job.Result is null || part < 0 || part >= job.Result.Parts.Count

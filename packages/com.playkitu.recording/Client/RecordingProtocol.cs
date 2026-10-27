@@ -11,12 +11,20 @@ namespace Playkitu.Client
 {
     public sealed class RecordingBuild
     {
-        public readonly string GameVersion, SteamBuildId;
-        public RecordingBuild(string gameVersion, string steamBuildId = null)
+        public readonly string GameVersion, SteamBuildId, PlayerDisplayName;
+        public RecordingBuild(string gameVersion, string steamBuildId = null, string playerDisplayName = null)
         {
             if (string.IsNullOrWhiteSpace(gameVersion) || gameVersion.Length > 64 || (steamBuildId != null
                 && (steamBuildId.Length > 20 || steamBuildId.Any(c => c < '0' || c > '9')))) throw new RecordingFailure("invalid_build");
-            GameVersion = gameVersion; SteamBuildId = steamBuildId;
+            if (playerDisplayName != null && (string.IsNullOrWhiteSpace(playerDisplayName)
+                || playerDisplayName.Length > 80 || playerDisplayName.Any(char.IsControl))) throw new RecordingFailure("invalid_build");
+            GameVersion = gameVersion; SteamBuildId = steamBuildId; PlayerDisplayName = playerDisplayName;
+        }
+        public JObject Declaration(bool includePlayerName = true)
+        {
+            var result = new JObject { ["gameVersion"] = GameVersion, ["steamBuildId"] = SteamBuildId };
+            if (includePlayerName && PlayerDisplayName != null) result["playerDisplayName"] = PlayerDisplayName;
+            return result;
         }
     }
     public sealed class RecordingObject
@@ -123,12 +131,12 @@ namespace Playkitu.Client
         }
         public static void Session(JObject json, Guid id)
         { if (!Guid.TryParseExact(Text(json, "sessionId", 36), "D", out var actual) || actual != id) throw new RecordingFailure("invalid_response"); }
-        public static JObject Start(Guid id, string proof, long seconds, string ticket, RecordingBuild build, bool microphone, DateTimeOffset consentUtc, int metadataFinalizationSeconds = 0)
+        public static JObject Start(Guid id, string proof, long seconds, string ticket, RecordingBuild build, bool microphone, DateTimeOffset consentUtc, int metadataFinalizationSeconds = 0, bool includePlayerName = false)
         {
             if (ticket == null || ticket.Length < 2 || ticket.Length > 5120 || ticket.Length % 2 != 0 || ticket.Any(c => !Uri.IsHexDigit(c))) throw new RecordingFailure("invalid_ticket");
             var result = new JObject { ["protocolVersion"] = 1, ["sessionId"] = id.ToString("D"), ["admissionUnixSeconds"] = seconds,
                 ["sessionProof"] = proof, ["steamTicketHex"] = ticket,
-                ["build"] = new JObject { ["gameVersion"] = build.GameVersion, ["steamBuildId"] = build.SteamBuildId },
+                ["build"] = build.Declaration(includePlayerName),
                 ["consent"] = new JObject { ["schemaVersion"] = 1, ["gameplayAudioAndLogs"] = true, ["microphone"] = microphone,
                     ["acceptedAtUtc"] = consentUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) } };
             // Advertised opt-in preserves legacy admission bodies/binding hashes.

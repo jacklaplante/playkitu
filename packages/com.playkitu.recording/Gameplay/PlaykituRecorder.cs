@@ -49,7 +49,7 @@ namespace Playkitu.Gameplay
 
         public bool Begin(bool requiredConsent, bool optionalMicrophoneConsent, IRecordingFactory factory,
             RecordingRunProfile frozenProfile, string runtimeDirectory, string buildVersion,
-            string healthKind = "playreel.recording-health")
+            string healthKind = "playreel.recording-health", string playerDisplayName = null)
         {
             if (!requiredConsent || !CanBegin) return false;
             // Consent is an explicit call supplied by the host; a serialized flag,
@@ -61,7 +61,7 @@ namespace Playkitu.Gameplay
                 microphoneConsent = optionalMicrophoneConsent; stopRequested = false; Failure = null;
                 retirement = null; retainedMedia = default; lastSnapshot = null; health = null;
                 microphoneFailure = RecordingMicrophoneFailure.None; lastNativeError = null; lastDegraded = false;
-                controller = new RecordingController(clock, factory, new RecordingBuild(buildVersion), profile.Upload);
+                controller = new RecordingController(clock, factory, new RecordingBuild(buildVersion, playerDisplayName: playerDisplayName), profile.Upload);
                 controller.InputStopped += StopInput;
                 if (factory.IsLive) {
                     using (var process = System.Diagnostics.Process.GetCurrentProcess())

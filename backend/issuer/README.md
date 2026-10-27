@@ -31,6 +31,15 @@ Terraform variables, state, command arguments, manifests, source or logs.
 
 ## Trust and protocol
 
+The optional build.playerDisplayName is private host-declared recording metadata,
+bounded to 80 nonblank characters with no control characters. It is stored with
+the session and included in the immutable admission binding, never used for Steam
+authorization, quota identity or role selection. Null names are omitted from
+serialization so pre-feature requests keep their exact binding hashes.
+Config advertises playerDisplayNames=true. Updated clients include the name in
+admission only when that capability is present; older issuers keep accepting their
+legacy requests. Deploy the issuer and reader before shipping a named client.
+
 Owner settings bind the Steam app, AWS account/region, exact issuer origin, the
 ordered stream ARNs, bucket/table, role path, media/retrieval roles and secret ARN.
 These values cannot come from a player request or downloaded recording. Defaults

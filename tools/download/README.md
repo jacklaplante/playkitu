@@ -1,5 +1,22 @@
 # Playkitu owner download tool
 
+The browser session list shows approximate observed activity length when the
+backend retained it. This is not playable-media duration: startup, uploads and
+gaps can differ. Older records without trustworthy timing say length unavailable.
+The four-hour admission deadline is never displayed as recording length.
+
+Use **Download logs** to fetch verified uploaded log chunks without fetching video,
+then **Save logs ZIP** to save them with download notes. Video downloads also expose
+their logs. Chunks remain separate and missing records are not silently repaired.
+
+New clients can supply a consented player display name when the issuer advertises
+support. The library shows that session's recorded name automatically. It is a
+host-declared label, not verified Steam identity or an authentication credential.
+Older sessions have anonymous tester identities, not usernames. **Name player**
+stores a fallback label in the local library's player-names.json; sessions with
+the same tester hash share that label. Legacy sessions lacking a tester hash are
+labelled individually. Local labels are not uploaded. Leaving one blank removes it.
+
 Read-only AWS catalogue/media retrieval plus offline inspection and log navigation.
 
 ## Playtest library — list, select, watch

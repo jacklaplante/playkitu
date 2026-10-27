@@ -69,7 +69,9 @@ public static class Wire
         CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(Hash(proof)), Encoding.ASCII.GetBytes(expectedHash));
 }
 
-public sealed record BuildDeclaration(string GameVersion, string? SteamBuildId = null);
+public sealed record BuildDeclaration(string GameVersion, string? SteamBuildId = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    string? PlayerDisplayName = null);
 public sealed record ConsentDeclaration(int SchemaVersion, bool GameplayAudioAndLogs, bool Microphone, DateTimeOffset AcceptedAtUtc);
 public sealed record StartRequest(int ProtocolVersion, Guid SessionId, long AdmissionUnixSeconds, string SessionProof,
     string SteamTicketHex, BuildDeclaration Build, ConsentDeclaration Consent, int MetadataFinalizationSeconds = 0)
@@ -82,6 +84,10 @@ public sealed record StartRequest(int ProtocolVersion, Guid SessionId, long Admi
         Wire.Require(Consent is { SchemaVersion: 1, GameplayAudioAndLogs: true }, "consent_required");
         Wire.Require(Build is not null && !string.IsNullOrWhiteSpace(Build.GameVersion) && Build.GameVersion.Length <= 64);
         Wire.Require(Build!.SteamBuildId is null || (Build.SteamBuildId.Length <= 20 && Build.SteamBuildId.All(char.IsAsciiDigit)));
+        // A host-declared display label is private recording metadata, never proof of identity.
+        // Omit null names when serializing so legacy admission binding hashes stay byte-identical.
+        Wire.Require(Build.PlayerDisplayName is null || (!string.IsNullOrWhiteSpace(Build.PlayerDisplayName)
+            && Build.PlayerDisplayName.Length <= 80 && !Build.PlayerDisplayName.Any(char.IsControl)));
         Wire.Require(SteamTicketHex is not null && SteamTicketHex.Length is > 0 and <= 5120 && SteamTicketHex.Length % 2 == 0
             && SteamTicketHex.All(char.IsAsciiHexDigit));
     }

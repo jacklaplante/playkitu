@@ -12,6 +12,18 @@ namespace Playkitu.Tests
 {
     public sealed class PlaykituBoundaryTests
     {
+        [Test] public void PlayerNameIsOptionalAndAdmissionRequiresServerCapability()
+        {
+            var build = new RecordingBuild("test", playerDisplayName: "Fozo");
+            var id = Guid.NewGuid(); var proof = RecordingIdentity.NewProof();
+            var legacy = RecordingProtocol.Start(id, proof, 1800000000, "aa", build, false, DateTimeOffset.UtcNow);
+            Assert.That(legacy["build"]["playerDisplayName"], Is.Null);
+            var named = RecordingProtocol.Start(id, proof, 1800000000, "aa", build, false, DateTimeOffset.UtcNow, includePlayerName: true);
+            Assert.That((string)named["build"]["playerDisplayName"], Is.EqualTo("Fozo"));
+            Assert.That(build.Declaration()["playerDisplayName"].ToString(), Is.EqualTo("Fozo"));
+            Assert.That(new RecordingBuild("legacy").Declaration()["playerDisplayName"], Is.Null);
+            Assert.Throws<RecordingFailure>(() => new RecordingBuild("test", playerDisplayName: "name\ninjected"));
+        }
         public static RecordingTrust ExampleTrust() => new RecordingTrust(480, "012345678901", "us-east-1",
             "https://example.execute-api.us-east-1.amazonaws.com/", "playkitu-", "example-playkitu-uploads");
 

@@ -60,7 +60,7 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
             return new { appId = options.SteamAppId, consentSchemaVersion = 1, identityPrefix = options.IdentityPrefix,
                 admissionUnixSeconds = Now.ToUnixTimeSeconds(), enabled = control.AdmissionsEnabled && control.UploadsEnabled,
                 limits = IssuerOptions.Limits(options.OnDemand, options.RecordingLimits), streamMode = options.StreamMode,
-                recordingLimits = options.OnDemand ? options.RecordingLimits : null };
+                recordingLimits = options.OnDemand ? options.RecordingLimits : null, playerDisplayNames = true };
         }
         throw Busy();
     }

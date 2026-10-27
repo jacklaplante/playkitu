@@ -19,6 +19,47 @@ public sealed class PlaytestLibraryTests
     [SetUp] public void Setup() { root = Path.Combine(Path.GetTempPath(), "playkitu-library-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root); }
     [TearDown] public void Cleanup() { Directory.Delete(root, true); }
 
+    [Test] public async Task FutureRecordingsShowDeclaredUsernameWithoutALocalLabel()
+    {
+        var f = new FixtureStore();
+        f.State.Build = new("test", PlayerDisplayName: "Fozo");
+        var listing = await new PlaytestLibrary(f, new FixtureProbe(), new Converter())
+            .ListAsync(new(2026, 10, 15), new(2026, 10, 15), default);
+        Assert.That(listing.Sessions.Single().PlayerName, Is.EqualTo("Fozo"));
+    }
+
+    [Test] public async Task ListingShowsObservedSessionLengthWithoutUsingTheFourHourDeadline()
+    {
+        var f = new FixtureStore();
+        f.State.OnDemand = true;
+        f.State.LastSeen = f.State.AdmittedAt!.Value.AddSeconds(137);
+        f.State.EndsAt = f.State.AdmittedAt.Value.AddHours(4);
+        var listing = await new PlaytestLibrary(f, new FixtureProbe(), new Converter())
+            .ListAsync(new(2026, 10, 15), new(2026, 10, 15), default);
+        Assert.That(listing.Sessions.Single().DurationSeconds, Is.EqualTo(137));
+        f.State.LastSeen = default; // Legacy rows have no trustworthy session end.
+        listing = await new PlaytestLibrary(f, new FixtureProbe(), new Converter())
+            .ListAsync(new(2026, 10, 15), new(2026, 10, 15), default);
+        Assert.That(listing.Sessions.Single().DurationSeconds, Is.Null);
+    }
+
+    [Test] public async Task LogsOnlyDownloadIncludesUnreferencedLogsWithoutReadingMedia()
+    {
+        var f = new FixtureStore(); f.Ready();
+        f.Add("log", 3, System.Text.Encoding.UTF8.GetBytes("A real uploaded log line\n"));
+        var converter = new Converter();
+        var output = Path.Combine(root, "logs");
+        var result = await new PlaytestLibrary(f, new FixtureProbe(), converter)
+            .DownloadAsync(FixtureStore.Id, output, _ => { }, default, includeVideo: false);
+        Assert.That(result.Status, Is.EqualTo("logs_downloaded"));
+        Assert.That(f.MediaReads, Is.Zero);
+        Assert.That(converter.Calls, Is.Zero);
+        Assert.That(result.Logs.Single().Sequence, Is.EqualTo(3));
+        var file = PlaytestLibrary.LogFile(output, result.Logs.Single().File);
+        Assert.That(await File.ReadAllTextAsync(file), Is.EqualTo("A real uploaded log line\n"));
+        Assert.That(() => PlaytestLibrary.LogFile(output, "../private.txt"), Throws.TypeOf<RetrievalError>());
+    }
+
     [Test] public async Task ListingUsesAdmissionDayIgnoresStaleIndexAndDeduplicates()
     {
         var f = new FixtureStore(); var lib = new PlaytestLibrary(f, new FixtureProbe(), new Converter());
@@ -106,7 +147,9 @@ public sealed class PlaytestLibraryTests
 
     [Test] public async Task LocalHttpBrowserListsDownloadsSupportsRangeAndBlocksCrossSiteRequests()
     {
-        var f = new FixtureStore(); f.Ready(); var lib = new PlaytestLibrary(f, new FixtureProbe(), new Converter());
+        var f = new FixtureStore(); f.Ready();
+        f.Add("log", 3, System.Text.Encoding.UTF8.GetBytes("Uploaded log contents\n"));
+        var lib = new PlaytestLibrary(f, new FixtureProbe(), new Converter());
         using var stop = new CancellationTokenSource(); var ready = new TaskCompletionSource<string>();
         var server = LibraryBrowser.RunAsync(lib, root, false, stop.Token, url => ready.SetResult(url));
         try {
@@ -121,6 +164,16 @@ public sealed class PlaytestLibraryTests
             using var hostile = new HttpRequestMessage(HttpMethod.Get, "jobs"); hostile.Headers.Add("Origin", "https://example.invalid");
             Assert.That((await http.SendAsync(hostile)).StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
             http.DefaultRequestHeaders.Add("X-Playkitu", "1");
+            using var name = new StringContent(JsonSerializer.Serialize("Test player <&>"), System.Text.Encoding.UTF8, "application/json");
+            Assert.That((await http.PostAsync("player-name/" + FixtureStore.Id, name)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            using var namedListing = JsonDocument.Parse(await http.GetStringAsync("sessions?from=2026-10-15&to=2026-10-15"));
+            Assert.That(namedListing.RootElement.GetProperty("sessions")[0].GetProperty("playerName").GetString(), Is.EqualTo("Test player <&>"));
+            Assert.That(File.ReadAllText(Path.Combine(root, "player-names.json")), Does.Contain("Test player"));
+            f.State.Build = f.State.Build with { PlayerDisplayName = "Actual game username" };
+            using var recordedListing = JsonDocument.Parse(await http.GetStringAsync("sessions?from=2026-10-15&to=2026-10-15"));
+            var recorded = recordedListing.RootElement.GetProperty("sessions")[0];
+            Assert.That(recorded.GetProperty("playerName").GetString(), Is.EqualTo("Actual game username"));
+            Assert.That(recorded.GetProperty("hasRecordedPlayerName").GetBoolean(), Is.True);
             using var download = JsonDocument.Parse(await (await http.PostAsync("download/" + FixtureStore.Id, null)).Content.ReadAsStringAsync());
             var id = download.RootElement.GetProperty("jobId").GetGuid();
             var done = false;
@@ -131,6 +184,10 @@ public sealed class PlaytestLibraryTests
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.PartialContent));
             Assert.That(await response.Content.ReadAsByteArrayAsync(), Is.EqualTo(new byte[] { 1, 2 }));
             Assert.That((await http.GetAsync("media/" + id + "/0/unknown")).StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(await http.GetByteArrayAsync("logs/" + id)));
+            using var log = new StreamReader(archive.GetEntry("logs-000003.log")!.Open());
+            Assert.That(await log.ReadToEndAsync(), Is.EqualTo("Uploaded log contents\n"));
+            Assert.That(archive.GetEntry("download-notes.txt"), Is.Not.Null);
         } finally { stop.Cancel(); try { await server; } catch (OperationCanceledException) { } }
     }
 }

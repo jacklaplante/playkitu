@@ -10,6 +10,26 @@ namespace Issuer.Tests;
 [TestFixture]
 public sealed class IssuerTests
 {
+    [Test] public async Task PlayerDisplayNameIsStoredButDoesNotReplaceVerifiedTesterIdentity()
+    {
+        var f = new Fixture();
+        var request = f.Start() with { Build = new("test", PlayerDisplayName: "Fozo") };
+        await f.Service.StartAsync(request, Ct);
+        var saved = (await f.Store.GetAsync<SessionState>(DbKey.Session(request.SessionId), Ct))!.Value;
+        Assert.That(saved.Build.PlayerDisplayName, Is.EqualTo("Fozo"));
+        Assert.That(saved.TesterHash, Is.Not.EqualTo("Fozo"));
+        Assert.That(request.Binding(), Is.Not.EqualTo((request with { Build = new("test", PlayerDisplayName: "Other") }).Binding()));
+        Assert.That(JsonSerializer.Serialize(new BuildDeclaration("old"), Wire.Json), Does.Not.Contain("playerDisplayName"));
+    }
+
+    [TestCase("")]
+    [TestCase("   ")]
+    [TestCase("name\ninjected")]
+    public void InvalidPlayerNamesAreRejectedBeforeAdmission(string name)
+    {
+        var request = new Fixture().Start() with { Build = new("test", PlayerDisplayName: name) };
+        Assert.That(request.Validate, Throws.TypeOf<IssuerError>());
+    }
     private static readonly CancellationToken Ct = CancellationToken.None;
     private static APIGatewayHttpApiV2ProxyRequest Event(string path, object? body = null, string? proof = null, string method = "POST") => new()
     {

@@ -266,7 +266,7 @@ namespace Playkitu.Client
         internal byte[] Manifest(int sequence, string phase)
         {
             var json = Root("manifest", sequence); json["phase"] = phase;
-            json["build"] = new JObject { ["gameVersion"] = build.GameVersion, ["steamBuildId"] = build.SteamBuildId };
+            json["build"] = build.Declaration();
             json["recordingStart"] = recordingStart?.DeepClone();
             json["applicationAcquisitionStart"] = ApplicationAcquisitionStart(runs.Count == 1 && DroppedRuns == 0 ? runs[0] : null);
             json["producerRuns"] = new JArray(runs.Select(r => new JObject {

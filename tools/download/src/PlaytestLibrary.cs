@@ -5,15 +5,19 @@ using Playkitu.Issuer;
 namespace Playkitu.Retrieval;
 
 public sealed record PlaytestSummary(Guid SessionId, DateTimeOffset StartedUtc, string Status,
-    string GameVersion, bool HasVideoSlot, bool MicrophoneConsented);
+    string GameVersion, bool HasVideoSlot, bool MicrophoneConsented, double? DurationSeconds = null,
+    string PlayerKey = "", string? PlayerName = null, bool HasRecordedPlayerName = false);
 public sealed record LibraryListing(IReadOnlyList<PlaytestSummary> Sessions, bool MayBeTruncated, string? NextCursor = null);
 public sealed record PlaybackPart(string Original, string? Preview);
+public sealed record RecordingLog(string File, int Sequence, long Bytes);
 public sealed class PlaytestDownload
 {
     public Guid SessionId { get; set; }
     public string Status { get; set; } = "downloading";
     public List<PlaybackPart> Parts { get; set; } = [];
     public List<string> Issues { get; set; } = [];
+    public List<RecordingLog> Logs { get; set; } = [];
+    public bool IncludesVideo { get; set; } = true;
 }
 public interface IPlaybackConverter { Task<bool> ConvertAsync(string input, string output, CancellationToken ct); }
 
@@ -22,9 +26,26 @@ public interface IPlaybackConverter { Task<bool> ConvertAsync(string input, stri
 public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlaybackConverter converter)
 {
     private sealed record Cursor(DateOnly From, DateOnly To, DateOnly Day, string? Page);
+    private static string PlayerKey(SessionState session) =>
+        Regex.IsMatch(session.TesterHash, @"\A[a-f0-9]{64}\z") ? session.TesterHash : session.SessionId.ToString("N");
+
+    public async Task<string> PlayerKeyAsync(Guid id, CancellationToken ct)
+    {
+        var session = await store.SessionAsync(id, ct) ?? throw new RetrievalError("session_not_found");
+        RetrievalService.ValidateSession(id, session);
+        return PlayerKey(session);
+    }
     public static string PlaybackFile(string directory, string relative)
     {
-        var match = Regex.Match(relative.Replace('\\', '/'), @"\A(section-[0-9]{2})/(media-[0-9]{4}\.(?:mkv|mp4))\z");
+        return DownloadFile(directory, relative, @"\A(section-[0-9]{2})/(media-[0-9]{4}\.(?:mkv|mp4))\z");
+    }
+    public static string LogFile(string directory, string relative)
+    {
+        return DownloadFile(directory, relative, @"\A(metadata-[0-9]{2})/(log-[0-9]{6}\.raw)\z");
+    }
+    private static string DownloadFile(string directory, string relative, string pattern)
+    {
+        var match = Regex.Match(relative.Replace('\\', '/'), pattern);
         if (!match.Success || (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new RetrievalError("invalid_playback_reference");
         var section = Path.Combine(directory, match.Groups[1].Value);
@@ -53,7 +74,14 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
                 RetrievalService.ValidateSession(id, s);
                 // Ignore stale/mismatched day-index entries; Dynamo TTL/GSI updates lag.
                 if (DateOnly.FromDateTime(s.AdmittedAt.Value.UtcDateTime) != cursor.Day) continue;
-                sessions[id] = new(id, s.AdmittedAt.Value, s.Status, s.Build.GameVersion, s.OnDemand ? s.StreamArn is not null : s.Slot >= 0, s.Consent.Microphone);
+                // LastSeen measures observed activity, not playable footage or the four-hour
+                // admission deadline. Older pooled rows do not maintain this session field.
+                double? duration = s.OnDemand && s.LastSeen >= s.AdmittedAt.Value
+                    ? (s.LastSeen - s.AdmittedAt.Value).TotalSeconds : null;
+                var name = s.Build.PlayerDisplayName;
+                if (name is not null && (string.IsNullOrWhiteSpace(name) || name.Length > 80 || name.Any(char.IsControl)))
+                    throw new RetrievalError("invalid_player_name");
+                sessions[id] = new(id, s.AdmittedAt.Value, s.Status, s.Build.GameVersion, s.OnDemand ? s.StreamArn is not null : s.Slot >= 0, s.Consent.Microphone, duration, PlayerKey(s), name, name is not null);
             }
             if (page.NextToken is null && cursor.Day == from) return new(sessions.Values.OrderByDescending(s => s.StartedUtc).ToArray(), false);
             cursor = page.NextToken is not null ? cursor with { Page = page.NextToken } : cursor with { Day = cursor.Day.AddDays(-1), Page = null };
@@ -81,10 +109,10 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
         return windows.ToArray();
     }
 
-    public async Task<PlaytestDownload> DownloadAsync(Guid session, string output, Action<string> progress, CancellationToken ct)
+    public async Task<PlaytestDownload> DownloadAsync(Guid session, string output, Action<string> progress, CancellationToken ct, bool includeVideo = true)
     {
         if (!Path.IsPathFullyQualified(output) || Directory.Exists(output) || File.Exists(output)) throw new RetrievalError("new_absolute_output_required");
-        Directory.CreateDirectory(output); var result = new PlaytestDownload { SessionId = session };
+        Directory.CreateDirectory(output); var result = new PlaytestDownload { SessionId = session, IncludesVideo = includeVideo };
         try {
             var catalog = new MetadataCatalog(store, probe); string? previous = null;
             var claims = new List<ClaimDigest>(); var finished = false;
@@ -94,11 +122,21 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
                 var page = await catalog.PageAsync(session, directory, previous, ct); previous = directory;
                 ct.ThrowIfCancellationRequested();
                 claims.AddRange(page.Summaries.SelectMany(s => s.Claims));
+                // Metadata pages already fetch and verify every uploaded log object. Expose
+                // those exact bytes, including logs outside persisted video fragment windows.
+                var bundle = JsonSerializer.Deserialize<RetrievalBundle>(
+                    await File.ReadAllBytesAsync(RetrievalService.LocalFile(directory, "bundle.json"), ct), Wire.Json)!;
+                foreach (var log in bundle.Objects.Where(o => o.Kind == "log").OrderBy(o => o.Sequence)) {
+                    var relative = Path.GetRelativePath(output, Path.Combine(directory, log.Raw.File));
+                    _ = LogFile(output, relative);
+                    result.Logs.Add(new(relative, log.Sequence, log.Raw.Bytes));
+                }
                 if (page.Status != "retrieved") result.Issues.Add("metadata_incomplete");
                 if (page.EnumerationComplete) { finished = true; break; }
             }
             if (!finished) throw new RetrievalError("metadata_page_chain_limit");
-            var windows = Windows(claims); if (windows.Length == 0) result.Issues.Add("no_persisted_video_fragments");
+            var windows = includeVideo ? Windows(claims) : [];
+            if (includeVideo && windows.Length == 0) result.Issues.Add("no_persisted_video_fragments");
             long bytes = 0;
             for (var n = 0; n < windows.Length; n++) {
                 ct.ThrowIfCancellationRequested();
@@ -120,7 +158,8 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
                     result.Parts.Add(new(Path.GetRelativePath(output, original), converted ? Path.GetRelativePath(output, preview) : null));
                 }
             }
-            result.Status = result.Parts.Count > 0 ? "downloaded" : "no_video";
+            result.Status = includeVideo ? result.Parts.Count > 0 ? "downloaded" : "no_video"
+                : result.Logs.Count > 0 ? "logs_downloaded" : "no_logs";
         } catch (OperationCanceledException) { result.Status = "cancelled"; result.Issues.Add("download_cancelled"); }
         catch (RetrievalError error) { result.Status = "incomplete"; result.Issues.Add(error.Code); }
         catch { result.Status = "incomplete"; result.Issues.Add("read_failed_check_owner_login"); }
