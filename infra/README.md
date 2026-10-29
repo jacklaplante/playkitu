@@ -66,6 +66,35 @@ Terraform 1.16.6 and AWS provider 6.69.0 are pinned. Initialization uses
 HTTP(S). No live Terraform plan/apply is used by tests. `PLAYKITU_TERRAFORM` may
 select an existing exact Terraform binary. Generated files stay in `infra/private`.
 
+## Session-end email maintenance
+
+Email is optional and off by default. It reuses the existing `${project}-alerts`
+SNS topic and confirmed email subscription; no new public endpoint or game build
+is needed. Only on-demand installations have the required minute worker.
+
+For an existing installation, first review current bootstrap/runtime state and
+the external owner-managed boundary. Preserve live `runtime_ready=true` and
+`owner_logging_ready=true`, account bindings and CONTROL; do not run a new-install
+seed. Render `access/prepare-owner.ps1` with `-SessionNotificationsEnabled` to
+review the boundary addition. For maintenance, append only its `SessionEndEmail`
+statement to the current boundary rather than overwriting other maintained rules.
+It allows `sns:Publish` only on the exact alert topic and only for the issuer role.
+The routine deploy role cannot make this IAM change.
+
+Apply a reviewed bootstrap plan with `session_notifications_enabled=true` for the
+matching issuer inline grant. Build/test/package the issuer, then review/apply the
+runtime plan with the same flag and explicit new artifact SHA. Verify that the
+subscription is confirmed before sending one clearly labelled synthetic test
+notification. The synthetic test proves email transport, not real recording
+completion; prove a subsequent consented session separately.
+
+Keep the flag in both installation tfvars for future maintenance. Turning runtime
+notifications off prevents eligibility for new sessions, but previously queued
+alerts remain pending until reenabled or their stream retires. Standard SNS email
+and uncertain delivery acknowledgements can produce rare duplicates. Do not
+promise exactly-once email. The outbox uses existing stream ledger/index records,
+not DynamoDB Streams, additional scan access or new IAM write privileges.
+
 ## Owner deployment sequence (not executed by these scripts)
 
 Use a dedicated PowerShell process, MFA and an owner-confirmed non-root IAM

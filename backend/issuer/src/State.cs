@@ -62,6 +62,10 @@ public sealed class StreamSlot
 }
 public sealed class SessionState
 {
+    // Frozen at admission: enabling email later never backfills old recordings.
+    public bool NotifyOnEnd { get; set; }
+    public string? EndReason { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
     public bool OnDemand { get; set; }
     public string TesterHash { get; set; } = "";
     public DateTimeOffset LastSeen { get; set; }
@@ -111,6 +115,11 @@ public sealed class UsageCounter { public long Count { get; set; } }
 // by a fixed shard, with an explicit timestamp rather than relying on TTL timing.
 public sealed class StreamWork
 {
+    // Durable notification outbox shares the existing due-work index. Closing,
+    // releasing capacity and queuing email commit in one transaction.
+    public SessionNotification? Notification { get; set; }
+    public DateTimeOffset? NotificationSentAt { get; set; }
+    public int NotificationAttempts { get; set; }
     public Guid SessionId { get; set; }
     public string AdmissionId { get; set; } = "";
     public string TesterHash { get; set; } = "";

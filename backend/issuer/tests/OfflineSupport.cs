@@ -177,14 +177,14 @@ public sealed class Fixture
     public IssuerService Service;
     public Function Handler;
     public IssuerOptions Options = Playkitu.Tests.DeploymentFixture.Create();
-    public Fixture(IssuerOptions? options = null, ISessionStreams? streams = null)
+    public Fixture(IssuerOptions? options = null, ISessionStreams? streams = null, ISessionNotifier? notifier = null)
     {
         if (options is not null) Options = options;
         Sts = new(Clock); Store = new(Db, Options.Table);
         var s3 = new AmazonS3Client(new SessionAWSCredentials("OFFLINE-SIGNER", "OFFLINE-SIGNER-SECRET", "OFFLINE-SIGNER-TOKEN"),
             new AmazonS3Config { RegionEndpoint = RegionEndpoint.USEast2, HttpClientFactory = new BlockedFactory() });
         Service = new(Store, new ValveVerifier(new HttpClient(Valve), new(Secrets, Options.PublisherSecretArn, Clock), Options.SteamAppId),
-            new StsMediaIssuer(Sts, Options.MediaRoleArn), new S3UploadSigner(s3, Options.Bucket), Options, Clock, streams);
+            new StsMediaIssuer(Sts, Options.MediaRoleArn), new S3UploadSigner(s3, Options.Bucket), Options, Clock, streams, notifier);
         Handler = new(Service, Clock);
     }
     public StartRequest Start(int salt = 0) => new(1, Guid.NewGuid(), Clock.GetUtcNow().ToUnixTimeSeconds(),

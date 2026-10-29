@@ -83,7 +83,7 @@ resource "aws_lambda_function" "issuer" {
   reserved_concurrent_executions = coalesce(local.c.lambda_concurrency, -1)
   ephemeral_storage { size = 512 }
   environment {
-    variables = {
+    variables = merge({
       PLAYKITU_DEPLOYMENT = jsonencode({
         awsAccountId       = local.c.account
         awsRegion          = local.c.region
@@ -103,7 +103,9 @@ resource "aws_lambda_function" "issuer" {
         identityPrefix     = local.c.identity_prefix
         identityDomain     = local.c.identity_domain
       })
-    }
+      }, var.session_notifications_enabled ? {
+      PLAYKITU_NOTIFICATION_TOPIC_ARN = "arn:aws:sns:${local.c.region}:${local.c.account}:${local.c.topic}"
+    } : {})
   }
 
   # No secret values, VPC/NAT, function URL, dead-letter payload capture or async destinations.
@@ -126,6 +128,16 @@ resource "aws_apigatewayv2_route" "issuer" {
 }
 output "issuer_endpoint" { value = var.api_endpoint }
 output "function_arn" { value = aws_lambda_function.issuer.arn }
+
+variable "session_notifications_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable future-session email after owner reviews exact-topic publish access and confirms the existing subscription. Never backfills sessions."
+  validation {
+    condition     = !var.session_notifications_enabled || module.configuration.contract.stream_mode == "onDemand"
+    error_message = "Session notifications require the one-minute on-demand cleanup worker."
+  }
+}
 
 variable "configuration_file" {
   type        = string

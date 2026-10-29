@@ -47,6 +47,14 @@ and the [integration guide](unity-integration.md).
 
 ## Viewing, costs and release gates
 
+- Optional session-end email is available for on-demand installations after
+  owner-reviewed SNS access, runtime enablement and subscription confirmation.
+  It is off by default and never backfills already-admitted sessions. A normal
+  ending does not verify complete footage/log delivery. Interrupted sessions are
+  detected after inactivity and scheduled checks, rather than immediately.
+  Durable retries stop at stream retirement; SNS/publish acknowledgement failures
+  can produce rare duplicates. Live delivery must be proved separately from tests.
+
 - The library is a **local developer app**, requiring the AWS CLI, an authorized
   retrieval login, .NET tooling and a built native probe. MP4 preview preparation
   also uses the pinned GStreamer developer cache. It is not a hosted team portal.

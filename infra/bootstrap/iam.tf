@@ -50,7 +50,9 @@ locals {
     { Effect = "Allow", Action = ["sts:AssumeRole"], Resource = local.roles.media },
     { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${aws_s3_bucket.recording.arn}/sessions/*" },
     { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "${local.log_arn}:log-stream:*" }
-  ], local.on_demand_issuer_statements)
+    ], local.on_demand_issuer_statements, var.session_notifications_enabled ? [
+    { Sid = "SessionEndEmail", Effect = "Allow", Action = ["sns:Publish"], Resource = local.topic_arn }
+  ] : [])
   media_statements = [{ Effect = "Allow", Action = ["kinesisvideo:DescribeStream", "kinesisvideo:GetDataEndpoint", "kinesisvideo:PutMedia"], Resource = local.readable_streams }]
   deploy_statements = [
     local.signin,

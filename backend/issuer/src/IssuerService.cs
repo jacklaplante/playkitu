@@ -10,10 +10,10 @@ public interface IMediaIssuer { Task<TemporaryMedia> IssueAsync(Guid session, st
 public interface IUploadSigner { Task<UploadGrant> SignAsync(StoredObject item, DateTimeOffset expires, CancellationToken ct); }
 
 public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve, IMediaIssuer media, IUploadSigner uploads,
-    IssuerOptions options, TimeProvider clock, ISessionStreams? sessionStreams = null)
+    IssuerOptions options, TimeProvider clock, ISessionStreams? sessionStreams = null, ISessionNotifier? notifier = null)
 {
     private readonly OnDemandSessions? dedicated = options.OnDemand
-        ? new(store, options, sessionStreams ?? throw new InvalidOperationException("On-demand stream manager required."), clock) : null;
+        ? new(store, options, sessionStreams ?? throw new InvalidOperationException("On-demand stream manager required."), clock, notifier) : null;
     private Task<bool> CommitAsync(Control control, IEnumerable<Put> writes, CancellationToken ct) =>
         store.CommitAsync(options.OnDemand ? writes : writes.Prepend(store.WriteControl(control)), ct, options.OnDemand ? control : null);
     private async Task<Control> ReadControlAsync(CancellationToken ct)
@@ -421,12 +421,13 @@ public sealed class IssuerService(DynamoIssuerStore store, IValveVerifier valve,
             var s = current.Value;
             if (s.Status == "closed") return new { sessionId = id, state = "closed" };
             var allocated = s.Status is "active" or "preparing";
+            s.EndReason = request.Reason; s.EndedAt = Now;
             s.Status = "closed";
             var writes = new List<Put>();
             if (s.OnDemand) {
                 var work = await store.GetAsync<StreamWork>(StreamWork.Key(s.AdmissionId), ct);
                 if (allocated && work is null) throw new IssuerError(503, "stream_work_unavailable");
-                if (work is not null) await dedicated!.CloseAsync(work.Value, work.Version, writes, ct);
+                if (work is not null) await dedicated!.CloseAsync(work.Value, work.Version, writes, ct, s);
             } else { control.State.Value.Pending.Remove(id); control.State.Value.End(id, Now); }
             writes.Add(store.Write(DbKey.Session(id), s, current.Version, s.PurgeAt));
             try

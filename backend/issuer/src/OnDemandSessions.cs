@@ -14,7 +14,7 @@ public interface ISessionStreams
 // active-session maps. Exact counters serialize admissions/retirement, never
 // heartbeats. Counts remain available when caps are disabled, so enabling a cap
 // does not silently forget admissions already made in the current period.
-public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions options, ISessionStreams streams, TimeProvider clock)
+public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions options, ISessionStreams streams, TimeProvider clock, ISessionNotifier? notifier = null)
 {
     private DateTimeOffset Now => clock.GetUtcNow();
     private static DbKey Tester(string hash) => new("TESTER#" + hash);
@@ -49,6 +49,7 @@ public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions opti
         await CountAsync(new("USAGE#MONTH#" + month), limits.AdmissionsPerMonth, "monthly_admission_limit", writes, ct, purge);
         await CountAsync(new("USAGE#TESTER#" + testerHash + "#" + day), limits.TesterAdmissionsPerDay, "tester_daily_admission_limit", writes, ct, purge);
         s.OnDemand = true; s.TesterHash = testerHash; s.Status = "preparing";
+        s.NotifyOnEnd = notifier is not null;
         s.AdmittedAt = now; s.EndsAt = now.AddSeconds(IssuerOptions.SessionSeconds); s.LastSeen = now;
         // Keep metadata until after the last possible retained media. The durable
         // stream work record itself has no TTL until deletion is acknowledged.
@@ -116,7 +117,7 @@ public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions opti
         writes.Add(store.Write(Tester(s.TesterHash), lease.Value, lease.Version, s.PurgeAt));
         writes.Add(store.Write(StreamWork.Key(s.AdmissionId), work.Value, work.Version));
     }
-    public async Task CloseAsync(StreamWork work, long version, List<Put> writes, CancellationToken ct)
+    public async Task CloseAsync(StreamWork work, long version, List<Put> writes, CancellationToken ct, SessionState? ended = null)
     {
         var lease = await store.GetAsync<TesterLease>(Tester(work.TesterHash), ct);
         // An expired tester lease may already belong to a newer admission. Never
@@ -132,6 +133,12 @@ public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions opti
             writes.Add(store.Write(ActiveCount, count.Value, count.Version));
         }
         work.Closed = true; work.Due = work.RetireAfter;
+        // Stream-ready sessions can still lack footage. Email describes a session
+        // ending, never promises that all video/audio/log uploads succeeded.
+        if (ended is { NotifyOnEnd: true, StreamArn: not null, AdmittedAt: not null }) {
+            work.Notification = SessionNotification.From(ended);
+            work.Due = Now.AddMinutes(1);
+        }
         writes.Add(store.Write(StreamWork.Key(work.AdmissionId), work, version));
     }
 
@@ -144,16 +151,37 @@ public sealed class OnDemandSessions(DynamoIssuerStore store, IssuerOptions opti
             if (!work.Closed) {
                 var current = await store.GetAsync<SessionState>(DbKey.Session(work.SessionId), ct);
                 var writes = new List<Put>();
+                SessionState? ended = null;
                 if (current?.Value is { } s && s.AdmissionId == work.AdmissionId) {
                     if (s.Status == "active" && s.LastSeen.AddSeconds(IssuerOptions.IdleSeconds) > Now && (s.MetadataUntilUtc ?? s.EndsAt) > Now)
                         throw new IssuerError(503, "cleanup_due_mismatch");
                     if (s.Status == "preparing" && s.AdmissionDeadline > Now) return;
-                    s.Status = "closed";
+                    s.EndReason = "interrupted"; s.EndedAt = Now; s.Status = "closed";
+                    ended = s;
                     writes.Add(store.Write(DbKey.Session(s.SessionId), s, current.Version, s.PurgeAt));
                 }
-                await CloseAsync(work, row.Version, writes, ct);
+                await CloseAsync(work, row.Version, writes, ct, ended);
                 if (await store.CommitAsync(writes, ct)) return;
                 continue;
+            }
+            if (work.Notification is not null && work.NotificationSentAt is null && work.RetireAfter > Now) {
+                // Claim before calling SNS. Concurrent cleanup invocations skip
+                // this lease; a crash/unknown publish retries after the lease.
+                // SNS standard email is at-least-once: rare duplicates are possible.
+                work.NotificationAttempts++;
+                work.Due = Now.AddMinutes(Math.Min(60, 1 << Math.Min(6, work.NotificationAttempts)));
+                if (!await store.CommitAsync([store.Write(StreamWork.Key(work.AdmissionId), work, row.Version)], ct)) continue;
+                if (notifier is null) throw new IssuerError(503, "notification_unavailable");
+                try { await notifier.SendAsync(work.Notification, ct); }
+                catch (OperationCanceledException) { throw; }
+                catch { throw new IssuerError(503, "notification_unavailable"); }
+                var claimed = await store.GetAsync<StreamWork>(StreamWork.Key(work.AdmissionId), ct);
+                if (claimed is not null && claimed.Value.NotificationSentAt is null) {
+                    claimed.Value.NotificationSentAt = Now; claimed.Value.Due = claimed.Value.RetireAfter;
+                    if (!await store.CommitAsync([store.Write(StreamWork.Key(work.AdmissionId), claimed.Value, claimed.Version)], ct))
+                        throw new IssuerError(503, "notification_ack_pending");
+                }
+                return;
             }
             if (work.RetireAfter > Now) return;
             // Admission names are never reused. The adapter validates ownership

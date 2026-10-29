@@ -5,13 +5,15 @@ param(
     [Parameter(Mandatory)][DateTimeOffset]$WindowStartUtc,
     [Parameter(Mandatory)][DateTimeOffset]$WindowEndUtc,
     [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$OutputDirectory,
-    [switch]$ExpiredExample
+    [switch]$ExpiredExample,
+    [switch]$SessionNotificationsEnabled
 )
 # Render reviewable console policies locally. Never sign in or execute AWS commands.
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path $PSScriptRoot
 . (Join-Path $taskRoot 'config.ps1')
 $c = Read-InfrastructureConfiguration $ConfigurationFile
+if ($SessionNotificationsEnabled -and $c.stream_mode -cne 'onDemand') { throw 'Session notifications require on-demand mode.' }
 if ($OperatorPrincipalArn -notmatch ("^arn:aws:iam::"+[regex]::Escape($c.account)+":(user|role)/[A-Za-z0-9_+=,.@/-]+$")) { throw 'Exact confirmed non-root operator ARN required.' }
 if ($OperatorPrincipalArn -eq "arn:aws:iam::$($c.account):role/$($c.seed_role)" -or $OperatorPrincipalArn -like "*role$($c.role_path)*") { throw 'Seed/project roles cannot be the operator.' }
 # Offline readiness examples must be unusable, even if copied into the console.
@@ -126,6 +128,11 @@ if($c.stream_mode-ceq'onDemand'){
         @{Effect='Allow';Action=@('kinesisvideo:DeleteStream');Resource=$taskSessionStreams;Condition=@{
             StringEquals=@{'aws:ResourceTag/Project'=$c.project;'aws:ResourceTag/ManagedBy'='playkitu'};StringLike=@{'aws:ResourceTag/Admission'=('?'*32)}}}
     )
+}
+if ($SessionNotificationsEnabled) {
+    # Only the issuer may use this ceiling to publish to the existing private
+    # alert destination. Other child roles gain no notification send access.
+    $taskBoundary += @{Sid='SessionEndEmail';Effect='Allow';Action=@('sns:Publish');Resource=$taskTopic;Condition=@{ArnEquals=@{'aws:PrincipalArn'=$taskIssuer}}}
 }
 # IAM mutation enumerates five child roles; CreateRole must supply the immutable
 $taskBoundaryLength = Save-Policy 'boundary.json' $taskBoundary

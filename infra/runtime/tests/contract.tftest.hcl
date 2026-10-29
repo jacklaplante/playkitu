@@ -44,6 +44,23 @@ run "reject_other_media_role" {
   variables { media_role_arn = "arn:aws:iam::123456789012:role/Administrator" }
   expect_failures = [var.media_role_arn]
 }
+run "notifications_use_only_existing_topic" {
+  command = plan
+  variables {
+    configuration_file            = "../deployment.on-demand.example.json"
+    stream_arns                   = []
+    session_notifications_enabled = true
+  }
+  assert {
+    condition     = aws_lambda_function.issuer.environment[0].variables.PLAYKITU_NOTIFICATION_TOPIC_ARN == "arn:aws:sns:us-east-2:123456789012:playkitu-alerts"
+    error_message = "Notifications must target only this deployment's existing alert topic."
+  }
+}
+run "reject_notifications_without_minute_worker" {
+  command = plan
+  variables { session_notifications_enabled = true }
+  expect_failures = [var.session_notifications_enabled]
+}
 run "reject_stream_count" {
   command = plan
   variables { stream_arns = [] }

@@ -6,6 +6,7 @@ using Amazon.S3;
 using Amazon.SecretsManager;
 using Amazon.SecurityToken;
 using Amazon.KinesisVideo;
+using Amazon.SimpleNotificationService;
 using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
@@ -137,6 +138,13 @@ public sealed class Function
         options.Validate();
         AWSConfigs.LoggingConfig.LogTo = LoggingOptions.None;
         var region = RegionEndpoint.GetBySystemName(options.AwsRegion);
+        var notificationTopic = Environment.GetEnvironmentVariable("PLAYKITU_NOTIFICATION_TOPIC_ARN");
+        ISessionNotifier? notifier = null;
+        if (!string.IsNullOrEmpty(notificationTopic)) {
+            SnsSessionNotifier.ValidateTopic(notificationTopic, options);
+            notifier = new SnsSessionNotifier(new AmazonSimpleNotificationServiceClient(new AmazonSimpleNotificationServiceConfig {
+                RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true }), notificationTopic);
+        }
         var dynamo = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true });
         var sts = new AmazonSecurityTokenServiceClient(new AmazonSecurityTokenServiceConfig { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true });
         var secrets = new AmazonSecretsManagerClient(new AmazonSecretsManagerConfig { RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true });
@@ -146,6 +154,6 @@ public sealed class Function
         return new(new(dynamo, options.Table), new ValveVerifier(http, new(secrets, options.PublisherSecretArn, time), options.SteamAppId),
             new StsMediaIssuer(sts, options.MediaRoleArn), new S3UploadSigner(s3, options.Bucket), options, time,
             options.OnDemand ? new SessionStreams(new AmazonKinesisVideoClient(new AmazonKinesisVideoConfig {
-                RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true }), options) : null);
+                RegionEndpoint = region, MaxErrorRetry = 0, IgnoreConfiguredEndpointUrls = true }), options) : null, notifier);
     }
 }

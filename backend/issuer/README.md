@@ -88,6 +88,32 @@ constructing AWS clients. The infrastructure helper wraps it in a conditional
 insert. Missing CONTROL fails closed. Never replace an existing CONTROL item or
 reset counters to run another test.
 
+## Session-end email (optional)
+
+On-demand installations can enable email through the existing SNS alert topic.
+The client and game build do not change. Runtime `session_notifications_enabled`
+sets `PLAYKITU_NOTIFICATION_TOPIC_ARN`; the handler validates this against the
+exact deployment topic. Admission freezes notification eligibility, so existing
+sessions and historical recordings never generate a backlog of alerts.
+
+Authenticated close persists the client reason/time and a notification in the
+same transaction as capacity release. Inactivity cleanup labels abandoned
+stream-ready sessions `interrupted`; failed stream preparation sends no alert.
+The existing minute worker claims due work before publishing and retries failures
+without blocking gameplay. Acknowledged sends leave the due queue until ordinary
+retirement. Pending sends expire with stream retention. SNS standard delivery or
+an uncertain publish/ack can cause a rare duplicate; the session ID identifies it.
+
+Alerts contain bounded player/build labels, approximate observed activity length,
+UTC times, session ID and ending classification. They contain no footage, logs,
+proofs, credentials or public download links. A client close is not proof all
+uploads arrived. Timeout detection follows the three-minute inactivity threshold,
+then scheduled processing, so interrupted alerts can take several minutes.
+
+Activation requires owner-reviewed exact-topic `sns:Publish` in both the issuer
+policy and its external boundary, plus a confirmed existing email subscription.
+See [notification maintenance](../../infra/README.md#session-end-email-maintenance).
+
 ## Tests and limits
 
 Tests use explicit fake credentials and blocked/fake HTTP transports; they do not

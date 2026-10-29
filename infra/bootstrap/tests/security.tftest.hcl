@@ -26,6 +26,21 @@ variables {
   api_id                 = "abc123def4"
 }
 
+run "notification_publish_is_issuer_only_exact_topic" {
+  command = plan
+  variables {
+    configuration_file            = "../deployment.on-demand.example.json"
+    session_notifications_enabled = true
+  }
+  assert {
+    condition     = one([for s in local.issuer_statements : s if try(s.Sid, "") == "SessionEndEmail"]).Resource == "arn:aws:sns:us-east-2:123456789012:playkitu-alerts"
+    error_message = "Issuer email publish permission must bind exactly the existing alert topic."
+  }
+  assert {
+    condition     = alltrue([for s in concat(local.deploy_statements, local.retrieval_statements, local.operations_statements, local.media_statements) : !contains(tolist(s.Action), "sns:Publish")])
+    error_message = "Routine human/media roles must not acquire email send permission."
+  }
+}
 run "on_demand_has_no_pool_and_only_scoped_stream_management" {
   command = apply
   variables {

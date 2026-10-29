@@ -64,6 +64,16 @@ variable "owner_logging_ready" {
   description = "Owner enabled the exact stage access logs in the console and reviewed its account-level log-delivery changes; persist true after reconciliation."
 }
 
+variable "session_notifications_enabled" {
+  type        = bool
+  default     = false
+  description = "Owner-approved issuer publish permission to the existing alert email topic. Review the external permissions boundary too."
+  validation {
+    condition     = !var.session_notifications_enabled || module.configuration.contract.stream_mode == "onDemand"
+    error_message = "Session notifications require the one-minute on-demand cleanup worker."
+  }
+}
+
 variable "configuration_file" {
   type        = string
   description = "Explicit owner configuration path; no default deployment or credentials."
