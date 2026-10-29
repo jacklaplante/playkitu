@@ -76,6 +76,14 @@
           "AWSSDK.Core": "[4.0.102.11, 5.0.0)"
         }
       },
+      "AWSSDK.SimpleNotificationService": {
+        "type": "Transitive",
+        "resolved": "4.0.100.1",
+        "contentHash": "xeTKUU0g1rzEzoO3S41P7pYzXESt0nHLpCESPBJ6DaReuwfI7X1t4t5Zfd/Av3OTFRAVhhSfq3kutszY2P6JCw==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.100.1, 5.0.0)"
+        }
+      },
       "Playkitu.Issuer": {
         "type": "Project",
         "dependencies": {
@@ -85,6 +93,7 @@
           "AWSSDK.S3": "[4.0.104.4, )",
           "AWSSDK.SecretsManager": "[4.0.100.19, )",
           "AWSSDK.SecurityToken": "[4.0.101.4, )",
+          "AWSSDK.SimpleNotificationService": "[4.0.100.1, 4.0.100.1]",
           "Amazon.Lambda.APIGatewayEvents": "[3.0.1, )",
           "Amazon.Lambda.Core": "[3.4.0, )",
           "Amazon.Lambda.Serialization.SystemTextJson": "[3.0.1, )"

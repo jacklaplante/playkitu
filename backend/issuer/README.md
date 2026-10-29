@@ -112,6 +112,8 @@ then scheduled processing, so interrupted alerts can take several minutes.
 
 Activation requires owner-reviewed exact-topic `sns:Publish` in both the issuer
 policy and its external boundary, plus a confirmed existing email subscription.
+Rebuild/update the developer download library alongside the issuer: its strict
+stored-state reader must recognize the new session ending/notification fields.
 See [notification maintenance](../../infra/README.md#session-end-email-maintenance).
 
 ## Tests and limits
