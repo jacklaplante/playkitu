@@ -311,15 +311,7 @@ namespace Playkitu.Client
         // display. The client stays independent of Main/Steam enum assemblies;
         // future/unknown adapter errors remain opaque, including null inputs.
         public static string SanitizeTicketFailure(string code)
-        {
-            switch (code) {
-                case "ticket_invalid_request": case "ticket_invalid_handle": case "ticket_rejected": case "ticket_invalid_response":
-                case "ticket_timed_out": case "ticket_cancelled": case "ticket_disposed": case "ticket_too_many_requests":
-                case "admission_consumer_failed": case "ticket_consent_required": case "ticket_unavailable":
-                    return code;
-                default: return "ticket_unavailable";
-            }
-        }
+            => RecordingDiagnostics.SanitizeTicketFailure(code);
         private string ErrorCode(RecordingHttpResponse response, bool diagnostic = false)
         {
             // Preserve the original control-flow vocabulary. Additional finite

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Playkitu.Issuer;
+using Playkitu.Client;
 
 namespace Playkitu.Retrieval;
 
@@ -18,6 +19,7 @@ public sealed class PlaytestDownload
     public List<string> Issues { get; set; } = [];
     public List<RecordingLog> Logs { get; set; } = [];
     public bool IncludesVideo { get; set; } = true;
+    public string? FailureCode { get; set; }
 }
 public interface IPlaybackConverter { Task<bool> ConvertAsync(string input, string output, CancellationToken ct); }
 
@@ -128,7 +130,14 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
                     await File.ReadAllBytesAsync(RetrievalService.LocalFile(directory, "bundle.json"), ct), Wire.Json)!;
                 foreach (var log in bundle.Objects.Where(o => o.Kind == "log").OrderBy(o => o.Sequence)) {
                     var relative = Path.GetRelativePath(output, Path.Combine(directory, log.Raw.File));
-                    _ = LogFile(output, relative);
+                    var file = LogFile(output, relative);
+                    // MetadataCatalog verified the receipt/hash before exposing
+                    // these bounded log bytes. Interpret only the canonical finite
+                    // failure marker; ordinary log/exception text remains opaque.
+                    foreach (var line in await File.ReadAllLinesAsync(file, ct)) {
+                        var failure = RecordingDiagnostics.ReadFailureLogLine(line);
+                        if (failure is not null) result.FailureCode = failure;
+                    }
                     result.Logs.Add(new(relative, log.Sequence, log.Raw.Bytes));
                 }
                 if (page.Status != "retrieved") result.Issues.Add("metadata_incomplete");

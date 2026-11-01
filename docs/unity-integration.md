@@ -59,6 +59,19 @@ Trust binds the exact API Gateway HTTPS origin, app, account, region, bucket and
 
 Wire End, menu return and disconnect to **Stop**; keep the actual menu/game action in your adapter. Disabled/destroyed hosts transfer retirement to a bounded owner. Do not add a competing quit loop or dispose the game's Steam owner while ticket use is still draining.
 
+After consent and admission, recorder failures also append a small
+`[playkitu-recording-failure-v1]` marker with a finite code to the existing log
+upload channel. This is explicit recorder evidence, not an Editor/Player.log
+file scrape. Specific capture/native failures take precedence over generic
+startup failure; expected cancellation during normal End/quit is excluded.
+The shared `RecordingDiagnostics` allowlist sanitizes producer values and validates
+library reads, so exceptions, credentials and the full local health snapshot are
+not uploaded through this report. Delivery uses existing bounded log budgets and
+shutdown; failure before admission or after uploads end may remain local only.
+The [owner library](../tools/download/README.md) displays the explanation/code
+after a recording or log-only download. Existing recordings cannot gain missing
+historical failure codes.
+
 ## Steam ownership
 
 **IRecordingTickets** lets you reuse a working game integration. **SteamRecordingTickets** can wrap a host-owned **SteamWebTicketClient**. The [Steamworks.NET template](../packages/com.playkitu.recording/Samples~/SteamworksHost/README.md) shows the callback boundary.

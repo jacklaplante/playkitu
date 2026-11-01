@@ -2,6 +2,7 @@ using NUnit.Framework;
 using Playkitu.Retrieval;
 using System.Net;
 using System.Text.Json;
+using Playkitu.Client;
 
 namespace Retrieval.Tests;
 
@@ -18,6 +19,31 @@ public sealed class PlaytestLibraryTests
     private string root = "";
     [SetUp] public void Setup() { root = Path.Combine(Path.GetTempPath(), "playkitu-library-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root); }
     [TearDown] public void Cleanup() { Directory.Delete(root, true); }
+
+    [TestCase(true), TestCase(false)]
+    public async Task MissingVideoAndLogsOnlyDownloadsExposeOnlyRecognizedRecorderFailureCodes(bool includeVideo)
+    {
+        var f = new FixtureStore(); // No media/ACK claims, just the uploaded failure log.
+        f.Add("log", 0, System.Text.Encoding.UTF8.GetBytes("ordinary log line\n" +
+            RecordingDiagnostics.FailureLogPrefix + "audio_format_unsupported\n" +
+            RecordingDiagnostics.FailureLogPrefix + "Bearer fake-private-test-value\n"));
+        var output = Path.Combine(root, "failure");
+        var result = await new PlaytestLibrary(f, new FixtureProbe(), new Converter())
+            .DownloadAsync(FixtureStore.Id, output, _ => { }, default, includeVideo);
+        Assert.That(result.FailureCode, Is.EqualTo("audio_format_unsupported"));
+        Assert.That(result.Parts, Is.Empty); Assert.That(f.MediaReads, Is.Zero);
+        Assert.That(result.Status, Is.EqualTo(includeVideo ? "no_video" : "logs_downloaded"));
+        var saved = JsonSerializer.Deserialize<PlaytestDownload>(await File.ReadAllTextAsync(Path.Combine(output, "playtest.json")), Playkitu.Issuer.Wire.Json)!;
+        Assert.That(saved.FailureCode, Is.EqualTo(result.FailureCode));
+    }
+
+    [TestCase("[playkitu-recording-failure-v1] native_startup_timeout", "native_startup_timeout")]
+    [TestCase("[playkitu-recording-failure-v1] audio_format_unsupported", "audio_format_unsupported")]
+    [TestCase("[playkitu-recording-failure-v1] secret_test_value", null)]
+    [TestCase("[playkitu-recording-failure-v1] audio_format_unsupported extra text", null)]
+    [TestCase("ordinary log audio_format_unsupported", null)]
+    public void RecorderFailureMarkersRejectUnknownOrUnframedText(string line, string? expected)
+        => Assert.That(RecordingDiagnostics.ReadFailureLogLine(line), Is.EqualTo(expected));
 
     [Test] public async Task FutureRecordingsShowDeclaredUsernameWithoutALocalLabel()
     {
@@ -136,7 +162,10 @@ public sealed class PlaytestLibraryTests
     [Test] public async Task CancellationOfBlockedMediaRetainsMetadataAndReportsCancelled()
     {
         var f = new FixtureStore { BlockMedia = true }; f.Ready();
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        using var cancel = new CancellationTokenSource();
+        // Cancel when the blocked media read actually starts. A wall-clock timer
+        // could cancel during metadata I/O on a busy machine and test a different path.
+        f.OnMediaRead = cancel.Cancel;
         var directory = Path.Combine(root, "cancelled");
         var result = await new PlaytestLibrary(f, new FixtureProbe(), new Converter()).DownloadAsync(FixtureStore.Id, directory, _ => { }, cancel.Token);
         Assert.That(result.Status, Is.EqualTo("cancelled"));
@@ -148,7 +177,8 @@ public sealed class PlaytestLibraryTests
     [Test] public async Task LocalHttpBrowserListsDownloadsSupportsRangeAndBlocksCrossSiteRequests()
     {
         var f = new FixtureStore(); f.Ready();
-        f.Add("log", 3, System.Text.Encoding.UTF8.GetBytes("Uploaded log contents\n"));
+        string uploadedLog = "Uploaded log contents\n" + RecordingDiagnostics.FailureLogPrefix + "native_startup_timeout\n";
+        f.Add("log", 3, System.Text.Encoding.UTF8.GetBytes(uploadedLog));
         var lib = new PlaytestLibrary(f, new FixtureProbe(), new Converter());
         using var stop = new CancellationTokenSource(); var ready = new TaskCompletionSource<string>();
         var server = LibraryBrowser.RunAsync(lib, root, false, stop.Token, url => ready.SetResult(url));
@@ -179,6 +209,8 @@ public sealed class PlaytestLibraryTests
             var done = false;
             for (var n = 0; n < 100 && !done; n++) { using var state = JsonDocument.Parse(await http.GetStringAsync("jobs")); done = state.RootElement[0].GetProperty("finished").GetBoolean(); if (!done) await Task.Delay(25); }
             Assert.That(done, Is.True);
+            using var finishedJobs = JsonDocument.Parse(await http.GetStringAsync("jobs"));
+            Assert.That(finishedJobs.RootElement[0].GetProperty("result").GetProperty("failureCode").GetString(), Is.EqualTo("native_startup_timeout"));
             using var media = new HttpRequestMessage(HttpMethod.Get, $"media/{id}/0/preview"); media.Headers.Range = new(1, 2);
             using var response = await http.SendAsync(media);
             Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.PartialContent));
@@ -186,8 +218,9 @@ public sealed class PlaytestLibraryTests
             Assert.That((await http.GetAsync("media/" + id + "/0/unknown")).StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
             using var archive = new System.IO.Compression.ZipArchive(new MemoryStream(await http.GetByteArrayAsync("logs/" + id)));
             using var log = new StreamReader(archive.GetEntry("logs-000003.log")!.Open());
-            Assert.That(await log.ReadToEndAsync(), Is.EqualTo("Uploaded log contents\n"));
-            Assert.That(archive.GetEntry("download-notes.txt"), Is.Not.Null);
+            Assert.That(await log.ReadToEndAsync(), Is.EqualTo(uploadedLog));
+            using var notes = new StreamReader(archive.GetEntry("download-notes.txt")!.Open());
+            Assert.That(await notes.ReadToEndAsync(), Does.Contain("Recorder failure code: native_startup_timeout"));
         } finally { stop.Cancel(); try { await server; } catch (OperationCanceledException) { } }
     }
 }

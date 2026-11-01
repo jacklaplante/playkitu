@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using Playkitu.Client;
 using Playkitu.Producer;
 using UnityEngine;
@@ -25,6 +26,7 @@ namespace Playkitu.Gameplay
         private RecordingControllerState lastState;
         private bool lastDegraded;
         private string lastNativeError;
+        private string lastReportedFailure;
         private RecordingHealthMedia retainedMedia;
         private RecordingHealthSnapshot lastSnapshot;
         private RecordingMicrophoneFailure microphoneFailure;
@@ -60,7 +62,7 @@ namespace Playkitu.Gameplay
                 runtime = Path.GetFullPath(runtimeDirectory); began = clock.Seconds;
                 microphoneConsent = optionalMicrophoneConsent; stopRequested = false; Failure = null;
                 retirement = null; retainedMedia = default; lastSnapshot = null; health = null;
-                microphoneFailure = RecordingMicrophoneFailure.None; lastNativeError = null; lastDegraded = false;
+                microphoneFailure = RecordingMicrophoneFailure.None; lastNativeError = null; lastDegraded = false; lastReportedFailure = null;
                 controller = new RecordingController(clock, factory, new RecordingBuild(buildVersion, playerDisplayName: playerDisplayName), profile.Upload);
                 controller.InputStopped += StopInput;
                 if (factory.IsLive) {
@@ -86,6 +88,7 @@ namespace Playkitu.Gameplay
             // Controller-owned natural expiry and user End use the same stop intent
             // before expected native_cancelled can be classified on the next Tick.
             stopRequested = true;
+            ReportFailure();
             try { StopMicrophone(); capture?.StopInput(); }
             finally { logs?.StopAndDrain(controller?.Uploader); logs = null; }
         }
@@ -93,12 +96,15 @@ namespace Playkitu.Gameplay
         {
             if (controller == null || destroyed) return;
             try {
+                // Capture callbacks can fail between recorder Updates. Report
+                // before Controller.Tick can seal its final diagnostic log batch.
+                ReportFailure();
                 controller.Tick(); logs?.Drain(controller.Uploader);
                 if (controller.StartupError != null || controller.Session?.State == RecordingSessionState.Unavailable) { Failure = Failure ?? "session_unavailable"; StopInput(); }
                 if (clock.Seconds - began > 45 && controller.Uploader == null) { Failure = Failure ?? "admission_unavailable"; Stop(); }
                 if (controller.State == RecordingControllerState.Starting && Failure == null && controller.Runner?.NativeState != 2 && controller.Uploader != null && clock.Seconds - began > 80) { Failure = "initialization_timeout"; Stop(); }
                 string error = controller.Runner?.Error;
-                if (capture?.Error != null || (error != null && !(stopRequested && error == "native_cancelled"))) { Failure = Failure ?? capture?.Error ?? "capture_unavailable"; capture?.StopInput(); }
+                if (capture?.Error != null || (error != null && !(stopRequested && error == "native_cancelled"))) { Failure = Failure ?? capture?.Error ?? "capture_unavailable"; ReportFailure(); capture?.StopInput(); }
                 var native = controller.Runner as NativeRecordingRunner;
                 if (!stopRequested && Failure == null && native?.InputReady == true && capture == null) {
                     capture = gameObject.AddComponent<RecordingCapture>(); capture.Begin(native, () => controller?.Timing, profile, runtime);
@@ -127,9 +133,29 @@ namespace Playkitu.Gameplay
         private void PublishHealth()
         {
             if (controller == null) return; // Keep the final receipt immutable until another explicit Begin.
+            ReportFailure();
             lastSnapshot = RecordingHealthSnapshot.Capture(controller, controller.Dependencies?.RuntimeSteamApp, stopRequested, destroyed,
                 capture == null || capture.InputStopped, logs?.Collecting ?? false, ReadMedia(), Failure);
             health?.Publish(lastSnapshot);
+        }
+        private void ReportFailure()
+        {
+            if (controller?.Uploader == null) return;
+            string native = controller.Runner?.Error;
+            // Normal End/quit cancels native work too. Do not label successful
+            // recordings as failures merely because teardown reports cancellation.
+            if (stopRequested && native == "native_cancelled") native = null;
+            string code = capture?.Error ?? native ?? controller.StartupError ?? Failure;
+            if (code == null) return;
+            code = RecordingDiagnostics.SafeError(code);
+            if (code == lastReportedFailure) return;
+            // Append directly to the existing consented, bounded log upload path,
+            // not Unity's log callback (which may already be unsubscribed). Only
+            // a finite safe code is serialized, never an exception or full health
+            // snapshot. Retry a full log buffer on a later Update without marking
+            // undelivered evidence as sent. The leading newline fences partial logs.
+            if (controller.Uploader.AppendLog(Encoding.UTF8.GetBytes("\n" + RecordingDiagnostics.FailureLogPrefix + code + "\n")))
+                lastReportedFailure = code;
         }
         private void OnEnable() { Application.wantsToQuit += WantsToQuit; }
         private void OnDisable()

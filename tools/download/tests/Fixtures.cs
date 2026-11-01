@@ -19,6 +19,7 @@ public sealed class FixtureStore : IReadStore
     public List<FragmentEntry> Fragments = [new("frag1", TimingEvidence.Unix(First), 1000, 32)];
     public byte[] Media = [1, 2, 3, 4];
     public int SessionReads, ObjectReads, MediaReads;
+    public Action? OnMediaRead;
     public List<SessionState> SessionRows = [];
     public List<int> SessionPageLimits = [];
     public bool BlockMedia;
@@ -50,7 +51,7 @@ public sealed class FixtureStore : IReadStore
     public Task<IReadOnlyList<FragmentEntry>> FragmentsAsync(string arn, DateTimeOffset start, DateTimeOffset end, int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<FragmentEntry>>(Fragments);
     public async Task<Stream> MediaAsync(string arn, IReadOnlyList<string> fragments, CancellationToken ct)
     {
-        MediaReads++; RequestedFragments.Add(fragments);
+        MediaReads++; RequestedFragments.Add(fragments); OnMediaRead?.Invoke();
         if (BlockMedia) await Task.Delay(Timeout.InfiniteTimeSpan, ct);
         return new MemoryStream(Media, false);
     }

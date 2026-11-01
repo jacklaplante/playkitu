@@ -170,6 +170,7 @@ public static class LibraryBrowser
                 var notes = zip.CreateEntry("download-notes.txt");
                 await using var writer = new StreamWriter(notes.Open());
                 await writer.WriteAsync("Uploaded log chunks; missing records are not reconstructed.\n"
+                    + (job.Result.FailureCode is null ? "" : "Recorder failure code: " + job.Result.FailureCode + "\n")
                     + string.Join("\n", job.Result.Issues));
               }
               archive.Position = 0;

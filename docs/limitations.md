@@ -59,6 +59,11 @@ and the [integration guide](unity-integration.md).
   retrieval login, .NET tooling and a built native probe. MP4 preview preparation
   also uses the pinned GStreamer developer cache. It is not a hosted team portal.
   Credentials expire and require ordinary sign-in again.
+- Updated clients include a safe recording failure code in the existing diagnostic
+  log uploads. Older sessions, failures before admission, and exhausted/unavailable
+  diagnostic uploads may lack that code; absence does not establish successful
+  capture. The library can explain reported failures but cannot recover footage
+  that was never stored.
 - Player names require a host-provided name, updated client and an issuer advertising
   playerDisplayNames. Existing anonymous recordings cannot recover old usernames;
   local operator labels remain available. Names are display metadata, not identity

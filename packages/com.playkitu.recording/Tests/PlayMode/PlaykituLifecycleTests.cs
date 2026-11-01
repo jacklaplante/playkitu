@@ -38,6 +38,48 @@ namespace Playkitu.Tests
             Assert.That(host.State, Is.EqualTo(RecordingControllerState.Running));
             return host;
         }
+        [TestCase("native_startup_timeout", "native_startup_timeout")]
+        [TestCase("Bearer fake-private-test-value", "recording_unavailable")]
+        public void RecorderFailureIsAppendedOnceBeforeShutdownWithoutPrivateText(string nativeFailure, string expected)
+        {
+            var factory = new Factory(); var go = new GameObject("offline uploaded failure code");
+            try {
+                var host = Start(go, factory);
+                var uploader = ((RecordingController)Get(host, "controller")).Uploader;
+                factory.Runner.Failure = nativeFailure;
+                host.Stop(); host.Stop();
+                var bytes = (byte[])Get(uploader, "log");
+                var text = Encoding.UTF8.GetString(bytes, 0, (int)Get(uploader, "logLength"));
+                Assert.That(text, Is.EqualTo("\n" + RecordingDiagnostics.FailureLogPrefix + expected + "\n"));
+                Assert.That(text, Does.Not.Contain("fake-private-test-value"));
+                factory.Runner.Hold = false;
+            } finally { Object.DestroyImmediate(go); }
+        }
+        [Test] public void CaptureFailureTakesPriorityAndNormalStopDoesNotReportCancellation()
+        {
+            var factory = new Factory(); var go = new GameObject("offline capture failure code");
+            try {
+                var host = Start(go, factory);
+                var uploader = ((RecordingController)Get(host, "controller")).Uploader;
+                host.Stop(); Tick(host);
+                Assert.That((int)Get(uploader, "logLength"), Is.Zero, "Normal native_cancelled is not a recording failure.");
+                factory.Runner.Hold = false;
+            } finally { Object.DestroyImmediate(go); }
+
+            factory = new Factory(); go = new GameObject("offline incompatible audio");
+            try {
+                var host = Start(go, factory);
+                var uploader = ((RecordingController)Get(host, "controller")).Uploader;
+                var capture = go.AddComponent<RecordingCapture>(); capture.enabled = false;
+                Property(capture, "Error", "audio_format_unsupported"); Set(host, "capture", capture);
+                factory.Runner.Failure = "native_initialization_failed";
+                host.Stop();
+                var text = Encoding.UTF8.GetString((byte[])Get(uploader, "log"), 0, (int)Get(uploader, "logLength"));
+                Assert.That(text, Does.Contain(RecordingDiagnostics.FailureLogPrefix + "audio_format_unsupported"));
+                Assert.That(text, Does.Not.Contain("native_initialization_failed"));
+                factory.Runner.Hold = false;
+            } finally { Object.DestroyImmediate(go); }
+        }
         [TestCase(false), TestCase(true)]
         public void DisabledActiveOrDrainingHostTransfersSameControllerAndFinishes(bool alreadyDraining)
         {
@@ -227,8 +269,8 @@ namespace Playkitu.Tests
         private sealed class Operation : IRecordingHttpOperation { private readonly RecordingHttpResponse response; public Operation(RecordingHttpResponse response) { this.response = response; } public bool IsDone => true; public RecordingHttpResponse Response => response; public void Dispose() { } }
         private sealed class Runner : IRecordingRunner
         {
-            public bool Hold = true; private bool stopping; public int Stops;
-            public bool Ready => true; public bool Released { get; private set; } public string Error => stopping ? "native_cancelled" : null;
+            public bool Hold = true; private bool stopping; public int Stops; public string Failure;
+            public bool Ready => true; public bool Released { get; private set; } public string Error => Failure ?? (stopping ? "native_cancelled" : null);
             public bool Degraded => false; public uint? NativeState => Released ? 4u : stopping ? 3u : 2u;
             public void Begin() { } public void Tick(RecordingTiming timing, bool generating) { if (stopping && !Hold) Released = true; }
             public void Stop() { if (!stopping) { stopping = true; Stops++; } }

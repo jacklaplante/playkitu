@@ -9,6 +9,15 @@ Use **Download logs** to fetch verified uploaded log chunks without fetching vid
 then **Save logs ZIP** to save them with download notes. Video downloads also expose
 their logs. Chunks remain separate and missing records are not silently repaired.
 
+Updated recorder clients append a finite failure code to the existing diagnostic
+log channel when capture/native startup fails. Recording downloads and log-only
+downloads show its explanation and exact code in the library; saved results and
+the logs ZIP's download-notes.txt retain the code. Ordinary native cancellation
+on End/quit is not a failure. Unknown exception/credential text is never used as
+a code. Older recordings may have no report: absence of a code is not evidence
+that capture worked. Reports remain best effort under the existing upload limits;
+a failure before admission or an unavailable diagnostic upload cannot report itself.
+
 New clients can supply a consented player display name when the issuer advertises
 support. The library shows that session's recorded name automatically. It is a
 host-declared label, not verified Steam identity or an authentication credential.

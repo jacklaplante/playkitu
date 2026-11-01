@@ -1,8 +1,32 @@
+#nullable disable
 namespace Playkitu.Client
 {
     // One finite code vocabulary for proof and gameplay health; never persist arbitrary exception/response text.
     public static class RecordingDiagnostics
     {
+        public const string FailureLogPrefix = "[playkitu-recording-failure-v1] ";
+
+        // This same finite vocabulary is linked into the owner library. A marker
+        // is diagnostic evidence supplied by the client, never an access decision.
+        // Unknown/credential-bearing strings must not survive either boundary.
+        public static string ReadFailureLogLine(string line)
+        {
+            if (line == null || !line.StartsWith(FailureLogPrefix, System.StringComparison.Ordinal)) return null;
+            string code = line.Substring(FailureLogPrefix.Length);
+            return code.Length <= 64 && code != "active" && code != "pending" && SafeError(code) == code ? code : null;
+        }
+
+        // Preserve the public RecordingSessionClient entry point while keeping
+        // the shared diagnostic vocabulary independent of session/network code.
+        public static string SanitizeTicketFailure(string code)
+        {
+            switch (code) {
+                case "ticket_invalid_request": case "ticket_invalid_handle": case "ticket_rejected": case "ticket_invalid_response":
+                case "ticket_timed_out": case "ticket_cancelled": case "ticket_disposed": case "ticket_too_many_requests":
+                case "admission_consumer_failed": case "ticket_consent_required": case "ticket_unavailable": return code;
+                default: return "ticket_unavailable";
+            }
+        }
         // Diagnostic-only issuer vocabulary. These codes must not change retry,
         // authentication, admission or quota decisions in RecordingSessionClient.
         public static bool IsIssuerLimitCode(string code)
@@ -38,6 +62,7 @@ namespace Playkitu.Client
                 case "meta_guard_failed": case "live_provider_missing": case "offline_arguments_only": case "invalid_proof_arguments":
                 case "interactive_consent_required": case "live_player_only":
                 case "recording_start_failed": case "recording_unavailable": case "steam_app_context_unavailable":
+                case "initialization_timeout": case "session_unavailable": case "capture_unavailable":
                 case "native_external_abi_mismatch": case "native_external_enable_failed": case "native_external_status_failed":
                 case "native_external_drain_failed": case "native_module_mismatch": case "native_export_missing":
                 case "gpu_readback_unsupported": case "gpu_readback_unavailable": case "gpu_capture_unavailable":
@@ -47,7 +72,7 @@ namespace Playkitu.Client
                 case "fresh_ticket_required": case "active": case "pending": case "opaque_response": case "transport_error":
                 case "missing_response": case "valve_error": case "missing_params": case "result_not_ok": case "missing_steamid":
                     return code;
-                default: return RecordingSessionClient.SanitizeTicketFailure(code) == code ? code : proof ? "proof_unavailable" : "recording_unavailable";
+                default: return SanitizeTicketFailure(code) == code ? code : proof ? "proof_unavailable" : "recording_unavailable";
             }
         }
     }

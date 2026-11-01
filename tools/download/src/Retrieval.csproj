@@ -10,6 +10,7 @@
     <EmbeddedResource Include="Browser.html" LogicalName="Playkitu.Retrieval.Browser.html" />
     <EmbeddedResource Include="../../../docs/assets/playkitu.png" LogicalName="Playkitu.Logo.png" />
     <Compile Include="../../../packages/com.playkitu.recording/Client/RecordingSchedulingMath.cs" Link="Shared/RecordingSchedulingMath.cs" />
+    <Compile Include="../../../packages/com.playkitu.recording/Client/RecordingDiagnostics.cs" Link="Shared/RecordingDiagnostics.cs" />
     <ProjectReference Include="../../../backend/issuer/src/Issuer.csproj" />
     <PackageReference Include="AWSSDK.Core" Version="[4.0.102.11]" />
     <PackageReference Include="AWSSDK.KinesisVideo" Version="[4.0.100.19]" />
