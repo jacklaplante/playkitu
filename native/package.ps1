@@ -1,8 +1,9 @@
-param([string]$RuntimeName = "runtime", [string]$RunnerDll, [string]$ProducerDll)
+param([string]$RuntimeName = "runtime", [string]$RunnerDll, [string]$ProducerDll, [string]$HarnessDirectory)
 . "$PSScriptRoot/common.ps1"
 try {
     if ($RuntimeName -notmatch "^runtime(?:-C2-[a-zA-Z0-9-]+)?$") { throw "Invalid task runtime name" }
-    if (!$RunnerDll) { $RunnerDll = Join-Path $Private "build-harness/PlaytestRecordingNativeProof.dll" }
+    if (!$HarnessDirectory) { $HarnessDirectory = Join-Path $Private 'build-harness' }
+    if (!$RunnerDll) { $RunnerDll = Join-Path $HarnessDirectory "PlaytestRecordingNativeProof.dll" }
     if (!$ProducerDll) { $ProducerDll = Join-Path $Private "build-producer-flat/gstkvssink.dll" }
     $gst = Join-Path $Private 'gstreamer/{app}'
     $evidence = Join-Path $Private 'build-evidence'
@@ -91,8 +92,8 @@ try {
     Copy-Item -LiteralPath $ProducerDll -Destination $dest
     $queue.Enqueue($dest)
     foreach ($pair in @(
-        @("$Private/build-harness/native-proof.exe", 'native-proof.exe'),
-        @("$Private/build-harness/native-media-probe.exe", 'native-media-probe.exe'),
+        @("$HarnessDirectory/native-proof.exe", 'native-proof.exe'),
+        @("$HarnessDirectory/native-media-probe.exe", 'native-media-probe.exe'),
         @($RunnerDll, 'PlaytestRecordingNativeProof.dll'),
         @("$gst/bin/gst-inspect-1.0.exe", 'gst-inspect-1.0.exe'),
         @("$gst/bin/gst-launch-1.0.exe", 'gst-launch-1.0.exe'),
@@ -112,6 +113,11 @@ try {
        HeaderSHA256=(Get-FileHash "$PSScriptRoot/native-synthetic-runner.h").Hash;
        MediaSHA256=(Get-FileHash "$PSScriptRoot/native-synthetic-media.cpp").Hash;
        ObserverSHA256=(Get-FileHash "$PSScriptRoot/native-synthetic-media.h").Hash;
+       EncoderSelectionSHA256=(Get-FileHash "$PSScriptRoot/native-encoder-selection.cpp").Hash;
+       EncoderSelectionHeaderSHA256=(Get-FileHash "$PSScriptRoot/native-encoder-selection.h").Hash;
+       EncoderProbeSHA256=(Get-FileHash "$PSScriptRoot/native-proof.cpp").Hash;
+       EncoderProbeExecutableSHA256=(Get-FileHash "$runtime/bin/native-proof.exe").Hash;
+       EncoderCandidateTimeoutMs=5000; EncoderSelectionBudgetMs=10000;
        PublicTrustSHA256=(Get-FileHash "$runtime/certs/cert.pem").Hash;
        Overlay='pinned GStreamer 1.28.8 timeoverlay/textoverlay (Pango); Windows Consolas font';
        TrustedRegionCapability=1; SubmittedUtcQuantizationBound100ns=10000; UtcTranslationGridNs=1000000;

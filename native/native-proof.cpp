@@ -9,6 +9,7 @@
 #include <limits>
 
 #include "native-synthetic-media.h"
+#include "native-encoder-selection.h"
 
 static void summary(const Samples& s) {
     std::cout << s.name << "_caps=" << s.caps << '\n'
@@ -41,6 +42,13 @@ static int number(const wchar_t* value, int low, int high) {
 }
 
 int run_native_proof(int argc, wchar_t** argv) {
+    if (argc == 9 && !wcscmp(argv[1], L"check-encoder")) {
+        const int width = number(argv[3], 64, 1280), height = number(argv[4], 64, 720), fps = number(argv[5], 1, 30);
+        const int bitrate = number(argv[6], 200, 2000), maximum = number(argv[7], 200, 2000), gop = number(argv[8], 1, 60);
+        if (width < 0 || height < 0 || fps < 0 || bitrate < 0 || maximum < bitrate || gop < fps || gop > 2 * fps || width % 2 || height % 2) return 2;
+        SbrecMediaConfigV1 config; config.videoKbps = bitrate; config.maxVideoKbps = maximum; config.gopFrames = gop;
+        return sbrec_encoder::check_hardware(utf8(argv[2]), width, height, fps, config);
+    }
     const bool encode = argc == 7 && !wcscmp(argv[1], L"encode");
     const bool decode = argc == 3 && !wcscmp(argv[1], L"decode");
     const bool probe = argc == 2 && !wcscmp(argv[1], L"probe");
@@ -97,14 +105,13 @@ int run_native_proof(int argc, wchar_t** argv) {
     }
     std::string pipeline;
     if (encode) {
-        GstElementFactory* factory = gst_element_factory_find("mfh264enc");
-        const char* klass = factory ? gst_element_factory_get_metadata(factory, GST_ELEMENT_METADATA_KLASS) : nullptr;
-        const bool hardware = klass && strstr(klass, "Hardware");
-        if (factory) gst_object_unref(factory);
-        if (!hardware) { DeleteFileW(argv[2]); std::cerr << "Hardware mfh264enc unavailable; fallback disabled\n"; return 3; }
+        SbrecMediaConfigV1 config; config.gopFrames = fps;
+        const auto encoder = sbrec_encoder::select_hardware(width, height, fps, config);
+        if (encoder.empty()) { DeleteFileW(argv[2]); std::cerr << "No usable hardware H.264 encoder\n"; return 3; }
+        std::cout << "hardware_encoder=" << encoder << std::endl;
         // Separate encoded AV pads are the kvssink contract. matroskamux here is
         // strictly offline validation; it is not the future AWS ingress format.
-        pipeline = "matroskamux name=mux ! filesink name=file " + synthetic_media(seconds, width, height, fps, "mux.", false);
+        pipeline = "matroskamux name=mux ! filesink name=file " + synthetic_media(seconds, width, height, fps, "mux.", false, &config, encoder.c_str());
     } else {
         // Decode all samples to fakesinks: validates playability without opening
         // speakers, a video window, microphone, desktop or other capture devices.

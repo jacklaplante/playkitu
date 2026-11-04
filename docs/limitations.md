@@ -25,6 +25,11 @@ old pooled streams to switch modes.
   2022.3.62f3 as the validated baseline. Other Unity versions/platforms need proof.
   The native path depends on Windows Media Foundation/H.264 hardware encoding;
   universal GPU/driver compatibility or a software fallback is not established.
+  Native startup checks candidate hardware encoders with isolated generated
+  media before selecting one. A stalled candidate can add five seconds; selection
+  is bounded to ten seconds/four candidates and may still find no working GPU.
+  Both the native recording DLL and its matching `native-proof.exe` are required.
+  A successful check does not guarantee continuous capture under later GPU load.
 - Profiles currently cap video at **1280×720, 30 FPS and 2,000 kbps**, with 48 kHz
   stereo AAC at 96 kbps. This is not a full-resolution/lossless recorder.
 - Recording is best effort and gameplay takes priority. Bounded queues, bandwidth

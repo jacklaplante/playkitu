@@ -18,8 +18,9 @@ struct Samples {
 };
 GstPadProbeReturn observe(GstPad*, GstPadProbeInfo*, gpointer);
 std::string synthetic_media(int seconds, int width, int height, int fps,
-                            const char* destination, bool counter, const SbrecMediaConfigV1* options = nullptr);
-std::string external_media(int width, int height, int fps, const char* destination, const SbrecMediaConfigV1* options = nullptr);
+    const char* destination, bool counter, const SbrecMediaConfigV1* options = nullptr, const char* encoder = "mfh264enc");
+std::string external_media(int width, int height, int fps, const char* destination, const SbrecMediaConfigV1* options = nullptr,
+    const char* encoder = "mfh264enc");
 extern std::atomic<bool> sbrec_native_owned;
 
 // kvssink / KVS FrameOrderCoordinator compare PTS on this owned runner's 1ms

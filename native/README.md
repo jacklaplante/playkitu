@@ -57,6 +57,40 @@ Source-scheduling uncertainty is a different measurement and remains unchanged.
 
 ## Tests and local tools
 
+### Hardware encoder startup checks
+
+Hardware Media Foundation registration does not establish usable encoding. A
+verified RX 7800 XT driver accepted two input frames, emitted no encoded video,
+and hung during teardown; the same machine's integrated hardware encoder worked.
+Before creating the recording pipeline, the native worker now checks available
+hardware H.264 factories in isolated, generated-only `native-proof.exe` processes.
+The first factory that emits video/audio and exits cleanly is used for capture.
+Software factories are excluded. No desktop, game, microphone, AWS SDK sink or
+credentials enter these checks. This does not prove that every later workload or
+GPU/driver will remain healthy.
+
+Each candidate has at most five seconds, the whole selection has ten seconds,
+and at most four hardware factories are attempted. Existing recording startup
+deadlines still apply. Cancel/stop kills only this generated-only process job,
+including any plugin scanner it owns; it never terminates the live SDK worker.
+If no candidate passes, initialization fails rather than selecting an untested
+encoder. Checks add startup latency, especially when the first driver stalls.
+
+The recording DLL and `bin/native-proof.exe` must be updated together. The
+packager inventories both and records encoder-selection source/helper hashes.
+`-HarnessDirectory` selects the matching build directory when packaging an
+isolated native build. `check-encoder` is an internal generated-only child mode;
+run it through a bounded parent because an unhealthy driver can also hang on exit.
+
+`native-encoder-selection-tests` exercises real child success/rejection, timeout,
+cancellation, credential-environment isolation, alternate selection and fixed
+budgets. Affected hardware also needs the real `run.ps1 -Mode Encode` check and
+the existing configured external-input/SDK fixture; passing process-policy tests
+alone does not reproduce a driver stall.
+`test.ps1 -GeneratedMedia` also encodes at the minimum supported 1 FPS through
+real candidate selection. That probe generates two seconds at the configured
+rate so it can verify two output frames without changing the five-second limit.
+
 `test.ps1` runs source patch checks, configuration, region/start ownership, clock
 unit, credential/signing/redaction and lifecycle regressions without capture,
 Steam, Unity, real credentials or cloud sockets. Its optional `-GeneratedMedia`

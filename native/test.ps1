@@ -9,6 +9,7 @@ try {
  $dll="$runtime/bin/PlaytestRecordingNativeProof.dll";$missing="$evidence/missing-public-ca.pem"
  $results=@()
  foreach($case in @(
+  @{name='encoder-selection';exe='native-encoder-selection-tests';args=@()},
   @{name='region';exe='native-region-tests';args=@($missing)},
   @{name='config';exe='native-media-config-tests';args=@($dll)},
   @{name='clock';exe='native-clock-tests';args=@('unit')},
@@ -31,6 +32,10 @@ try {
  if($r.ExitCode){throw "Managed CREATED-only loader check failed: $($r.Log)"}
  $results+=@{name='managed-capability';exitCode=0;log=$r.Log}
  if($GeneratedMedia) {
+  # Exercise real encoder selection at the lowest supported frame rate, not
+  # just candidate policy. The child must prove at least two frames at 1 FPS.
+  $r=Invoke-BoundedProcess "$runtime/bin/native-proof.exe" @('encode',"$evidence/one-fps.mkv",'3','640','360','1') $evidence "$evidence/encoder-selection-one-fps.log" 30 $envs -MinimalEnvironment
+  if($r.ExitCode){throw "Generated 1 FPS encoder selection failed: $($r.Log)"};$results+=@{name='encoder-selection-one-fps';exitCode=0;log=$r.Log}
   $plugins="$evidence/plugins";New-Item -ItemType Directory $plugins | Out-Null
   Get-ChildItem "$runtime/plugins" -File | Where-Object Name -ne 'gstkvssink.dll' | Copy-Item -Destination $plugins
   Copy-Item "$Private/build-producer-flat/offline/gstkvssink.dll" $plugins

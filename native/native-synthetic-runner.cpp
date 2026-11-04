@@ -2,6 +2,7 @@
 // packaging, signing, refresh callbacks, MKV, transport, retries and ACK parsing.
 #include "native-synthetic-runner.h"
 #include "native-synthetic-media.h"
+#include "native-encoder-selection.h"
 #include "native-media-clock.h"
 #include <windows.h>
 #include <array>
@@ -271,13 +272,16 @@ void worker(Run* rp) noexcept {
         gst_init(nullptr,nullptr);
         r.startup(STARTUP_GST_READY);
         if(r.stop) throw static_cast<uint32_t>(RUN_CANCELLED);
-        GstElementFactory* f=gst_element_factory_find("mfh264enc");
-        const char* klass=f ? gst_element_factory_get_metadata(f,GST_ELEMENT_METADATA_KLASS) : nullptr;
-        bool hardware=klass && strstr(klass,"Hardware"); if(f) gst_object_unref(f);
-        if(!hardware) throw static_cast<uint32_t>(RUN_INIT_FAILED);
+        // Hardware enumeration alone is not proof of a usable encoder. The
+        // RX 7800 XT MFT can accept two frames then hang, including on NULL.
+        // Isolate generated checks before creating kvssink/credentials so a
+        // bad driver can be retired safely and another hardware GPU selected.
+        const auto encoder=sbrec_encoder::select_hardware(r.settings.width,r.settings.height,r.settings.fps,r.mediaConfig,cancelled,&r);
+        if(r.stop) throw static_cast<uint32_t>(RUN_CANCELLED);
+        if(encoder.empty()) throw static_cast<uint32_t>(RUN_INIT_FAILED);
         auto description=std::string("kvssink name=kvs ")+(r.external
-            ? external_media(r.settings.width,r.settings.height,r.settings.fps,"kvs.",&r.mediaConfig)
-            : synthetic_media(r.settings.seconds,r.settings.width,r.settings.height,r.settings.fps,"kvs.",true,&r.mediaConfig));
+            ? external_media(r.settings.width,r.settings.height,r.settings.fps,"kvs.",&r.mediaConfig,encoder.c_str())
+            : synthetic_media(r.settings.seconds,r.settings.width,r.settings.height,r.settings.fps,"kvs.",true,&r.mediaConfig,encoder.c_str()));
         GError* error=nullptr; pipeline=gst_parse_launch(description.c_str(),&error);
         if(error) { g_error_free(error); throw static_cast<uint32_t>(RUN_INIT_FAILED); }
         if(!pipeline) throw static_cast<uint32_t>(RUN_INIT_FAILED);
