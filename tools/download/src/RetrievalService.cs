@@ -56,7 +56,8 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
             || s.Generation is < 1 or > 3 || !Guid.TryParseExact(s.AdmissionId, "N", out _) || s.Slot < -1 || s.Slot >= Deployment.MaxVideoStreams)
             throw new RetrievalError("invalid_session_metadata");
     }
-    public async Task<RetrievalBundle> FetchAsync(Guid id, string output, CancellationToken ct, ProducerWindow? window = null, bool metadataOnly = false)
+    public async Task<RetrievalBundle> FetchAsync(Guid id, string output, CancellationToken ct, ProducerWindow? window = null, bool metadataOnly = false,
+        Action<string>? progress = null)
     {
         limits.Validate(); output = Path.GetFullPath(output);
         if (Directory.Exists(output) || File.Exists(output)) throw new RetrievalError("output_exists");
@@ -73,6 +74,8 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
         {
             var entries = await store.ObjectsAsync(session.Prefix, limits.ObjectCount, token);
             if (entries.Count > limits.ObjectCount) throw new RetrievalError("object_limit");
+            var checkedFiles = 0;
+            progress?.Invoke($"Checked 0 of {entries.Count} files");
             var seen = new HashSet<(string, int)>();
             foreach (var entry in entries.OrderBy(x => x.Key, StringComparer.Ordinal))
             {
@@ -117,13 +120,18 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
                 catch (RetrievalError error) when (!error.Code.EndsWith("limit", StringComparison.Ordinal)) { bundle.Issues.Add(error.Code); }
                 catch (Exception error) when (error is IssuerError or JsonException or InvalidDataException or FormatException or OverflowException)
                 { bundle.Issues.Add("invalid_object_evidence"); }
+                finally {
+                    // One metadata page may take minutes. Count attempted files,
+                    // including rejected evidence, without calling them verified.
+                    progress?.Invoke($"Checked {++checkedFiles} of {entries.Count} files");
+                }
             }
             if (!metadataOnly) {
             var timing = await ReadTimingAsync(output, bundle, token);
             if (timing.LatestManifest < 0) bundle.Issues.Add("manifest_unavailable");
             bundle.Issues.AddRange(timing.Uncertainties.Distinct());
             await ReconstructLogsAsync(output, bundle, timing, token);
-            if (session.OnDemand && session.StreamArn is not null || session.Slot >= 0) await FetchMediaAsync(output, bundle, timing, session, budget, token);
+            if (session.OnDemand && session.StreamArn is not null || session.Slot >= 0) await FetchMediaAsync(output, bundle, timing, session, budget, token, progress);
             else bundle.Issues.Add("logs_only_session");
             }
             bundle.Status = bundle.Issues.Count == 0 ? "retrieved" : "incomplete";
@@ -138,7 +146,7 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
         return bundle;
     }
 
-    private async Task FetchMediaAsync(string output, RetrievalBundle bundle, TimingEvidence timing, SessionState session, TransferBudget budget, CancellationToken ct)
+    private async Task FetchMediaAsync(string output, RetrievalBundle bundle, TimingEvidence timing, SessionState session, TransferBudget budget, CancellationToken ct, Action<string>? progress)
     {
         var ranges = timing.MergedRanges(limits, bundle.Window);
         if (ranges.Count == 0) { bundle.Issues.Add("producer_range_unavailable"); return; }
@@ -189,24 +197,34 @@ public sealed class RetrievalService(IReadStore store, IMediaProbe probe, Retrie
                     var f = item.Fragment;
                     if (f.Bytes > limits.AdvertisedBatchBytes || f.DurationMs > limits.BatchSeconds * 1000L) { bundle.Issues.Add("fragment_exceeds_batch_limits"); continue; }
                     if (batch.Count > 0 && (bytes + f.Bytes > limits.AdvertisedBatchBytes || f.ProducerUtc.AddMilliseconds(f.DurationMs) - batch[0].ProducerUtc > TimeSpan.FromSeconds(limits.BatchSeconds)))
-                    { await DownloadMediaAsync(output, bundle, range, group.Key, batch, arn, budget, targets, ct); batch = []; bytes = 0; }
+                    { await DownloadMediaAsync(output, bundle, range, group.Key, batch, arn, budget, targets, ct, progress); batch = []; bytes = 0; }
                     batch.Add(f); bytes = checked(bytes + f.Bytes);
                 }
-                if (batch.Count > 0) await DownloadMediaAsync(output, bundle, range, group.Key, batch, arn, budget, targets, ct);
+                if (batch.Count > 0) await DownloadMediaAsync(output, bundle, range, group.Key, batch, arn, budget, targets, ct, progress);
             }
         }
     }
-    private async Task DownloadMediaAsync(string output, RetrievalBundle bundle, ProducerRange range, ulong upload, List<FragmentEntry> fragments, string arn, TransferBudget budget, IReadOnlyList<ulong> targets, CancellationToken ct)
+    private async Task DownloadMediaAsync(string output, RetrievalBundle bundle, ProducerRange range, ulong upload, List<FragmentEntry> fragments, string arn, TransferBudget budget, IReadOnlyList<ulong> targets, CancellationToken ct, Action<string>? progress)
     {
         var stem = $"media-{bundle.Media.Count:D4}"; var partial = Path.Combine(output, stem + ".mkv.partial");
+        var part = bundle.Media.Count + 1;
+        long nextUpdate = 0;
+        progress?.Invoke($"Receiving video/audio · part {part}");
         await using (var source = await store.MediaAsync(arn, fragments.Select(f => f.Id).ToArray(), ct))
-        await using (var target = NewFile(partial)) await budget.CopyAsync(source, target, limits.MediaFileBytes, false, ct);
+        await using (var target = NewFile(partial)) await budget.CopyAsync(source, target, limits.MediaFileBytes, false, ct, copied => {
+            // Report bytes actually written, coalescing fast reads so progress
+            // does not become a per-buffer UI/logging workload.
+            if (Environment.TickCount64 < nextUpdate) return;
+            nextUpdate = Environment.TickCount64 + 250;
+            progress?.Invoke($"Receiving video/audio · part {part} · {copied / (double)RetrievalLimits.MiB:0.0} MB received");
+        });
         var mediaPath = Path.Combine(output, stem + ".mkv"); File.Move(partial, mediaPath);
         var media = await SavedAsync(mediaPath, "media", -1, ct); SavedFile? probeFile = null;
         var mediaIndex = bundle.Media.Count;
         bundle.Media.Add(new(range.RunId, range.Epoch, upload, fragments.Select(f => f.Id).ToArray(), media, null));
         var probePath = Path.Combine(output, stem + ".probe.json");
         var complete = false;
+        progress?.Invoke($"Checking video/audio · part {part}");
         var code = await probe.RunAsync(mediaPath, probePath, ct, targets);
         if (code != 0) bundle.Issues.Add("probe_incomplete");
         if (File.Exists(probePath) && new FileInfo(probePath).Length <= 2 * RetrievalLimits.MiB)

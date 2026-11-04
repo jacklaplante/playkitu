@@ -121,7 +121,8 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
             for (var n = 0; n < 32; n++) {
                 progress($"Reading session metadata · page {n + 1}");
                 var directory = Path.Combine(output, $"metadata-{n:D2}");
-                var page = await catalog.PageAsync(session, directory, previous, ct); previous = directory;
+                var page = await catalog.PageAsync(session, directory, previous, ct,
+                    detail => progress($"Reading session files · batch {n + 1} · {detail}")); previous = directory;
                 ct.ThrowIfCancellationRequested();
                 claims.AddRange(page.Summaries.SelectMany(s => s.Claims));
                 // Metadata pages already fetch and verify every uploaded log object. Expose
@@ -153,7 +154,8 @@ public sealed class PlaytestLibrary(IReadStore store, IMediaProbe probe, IPlayba
                     throw new RetrievalError("download_disk_space_low");
                 progress($"Downloading video and audio · section {n + 1} of {windows.Length}");
                 var directory = Path.Combine(output, $"section-{n:D2}");
-                var bundle = await catalog.FetchWindowAsync(session, previous!, directory, windows[n], ct);
+                var bundle = await catalog.FetchWindowAsync(session, previous!, directory, windows[n], ct,
+                    detail => progress($"Section {n + 1} of {windows.Length} · {detail}"));
                 ct.ThrowIfCancellationRequested();
                 bytes = checked(bytes + bundle.DownloadedBytes);
                 if (bytes > 16L * 1024 * 1024 * 1024) throw new RetrievalError("playtest_download_limit");

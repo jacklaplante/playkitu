@@ -49,6 +49,14 @@ Only one download runs at a time, with progress and cancellation. The default
 destination is `tools/download/private/library`; `-Output ABSOLUTE_DIRECTORY`
 changes it. `-NoOpen` prints the URL without opening a browser.
 
+The activity banner stays visible when selecting another playtest. It reports
+checked files within each metadata batch, bytes received for each media part,
+elapsed time and the age of the last progress update. A moving activity bar means
+the request is running; it is not an estimate of completion. File counts restart
+per batch and media bytes per part because the total download size is not known
+in advance. A quiet request shows how long it has been waiting; **Cancel** applies
+to the active download even while another playtest is selected.
+
 Playback uses the native runtime plus the pinned GStreamer developer cache from
 `native/prepare.ps1`. The small game runtime intentionally omits MP4 muxing; the
 app does not modify it. `-NativeRuntime ABSOLUTE_DIRECTORY` selects the native

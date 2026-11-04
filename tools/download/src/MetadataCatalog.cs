@@ -137,7 +137,7 @@ public sealed class MetadataCatalog(IReadStore store, IMediaProbe probe)
         for (int i = 1; i < pages.Count; i++) if (pages[i - 1].Page.NextToken is null) throw new RetrievalError("metadata_page_after_end");
         return pages;
     }
-    public async Task<MetadataPage> PageAsync(Guid id, string output, string? previous, CancellationToken ct)
+    public async Task<MetadataPage> PageAsync(Guid id, string output, string? previous, CancellationToken ct, Action<string>? progress = null)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct); deadline.CancelAfter(TimeSpan.FromSeconds(300)); ct = deadline.Token;
         var session = await store.SessionAsync(id, ct) ?? throw new RetrievalError("session_not_found"); RetrievalService.ValidateSession(id, session);
@@ -148,7 +148,7 @@ public sealed class MetadataCatalog(IReadStore store, IMediaProbe probe)
         if (page.NextToken is not null && chain.Any(p => p.Page.NextToken == page.NextToken)) throw new RetrievalError("repeated_page");
         // The original downloader validates every server-derived key and receipt.
         var selected = new SelectedObjectsStore(store, page.Entries);
-        var bundle = await new RetrievalService(selected, probe).FetchAsync(id, output, ct, metadataOnly: true);
+        var bundle = await new RetrievalService(selected, probe).FetchAsync(id, output, ct, metadataOnly: true, progress: progress);
         var summaries = new List<MetadataSummary>();
         foreach (var item in bundle.Objects) {
             if (item.Kind == "log") { summaries.Add(new(item.Kind, item.Sequence, null, null, [], false, [], [], null, [])); continue; }
@@ -174,7 +174,7 @@ public sealed class MetadataCatalog(IReadStore store, IMediaProbe probe)
         await file.WriteAsync(bytes, ct); return result;
     }
 
-    public async Task<RetrievalBundle> FetchWindowAsync(Guid id, string lastPage, string output, ProducerWindow window, CancellationToken ct)
+    public async Task<RetrievalBundle> FetchWindowAsync(Guid id, string lastPage, string output, ProducerWindow window, CancellationToken ct, Action<string>? progress = null)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct); deadline.CancelAfter(TimeSpan.FromSeconds(300)); ct = deadline.Token; window.Validate();
         var session = await store.SessionAsync(id, ct) ?? throw new RetrievalError("session_not_found"); RetrievalService.ValidateSession(id, session);
@@ -223,7 +223,7 @@ public sealed class MetadataCatalog(IReadStore store, IMediaProbe probe)
         }
         // Reuses current strong receipt/admission validation and download limits.
         // Local compressed metadata is conservatively charged to the same budget.
-        return await new RetrievalService(new SelectedObjectsStore(store, entries, local), probe).FetchAsync(id, output, ct, window);
+        return await new RetrievalService(new SelectedObjectsStore(store, entries, local), probe).FetchAsync(id, output, ct, window, progress: progress);
     }
     private static string Digest(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }

@@ -71,7 +71,7 @@ public sealed class TransferBudget(RetrievalLimits limits)
     public long Expanded { get; private set; }
     // Charge every received byte, including a rejected over-limit chunk. Reads
     // have a fixed small buffer; limits bound accepted output, not wire overhead.
-    public async Task<long> CopyAsync(Stream input, Stream output, long fileLimit, bool expanded, CancellationToken ct)
+    public async Task<long> CopyAsync(Stream input, Stream output, long fileLimit, bool expanded, CancellationToken ct, Action<long>? copied = null)
     {
         long count = 0;
         var buffer = new byte[16384];
@@ -84,6 +84,7 @@ public sealed class TransferBudget(RetrievalLimits limits)
             if (count > fileLimit || (expanded ? Expanded > limits.ExpandedBytes : Downloaded > limits.DownloadBytes))
                 throw new RetrievalError(expanded ? "decompression_limit" : "download_limit");
             await output.WriteAsync(buffer.AsMemory(0, n), ct);
+            copied?.Invoke(count);
         }
     }
 }

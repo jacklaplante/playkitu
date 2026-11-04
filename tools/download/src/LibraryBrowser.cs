@@ -19,6 +19,8 @@ namespace Playkitu.Retrieval;
 
 public sealed class LibraryJob(Guid id, Guid session, string directory)
 {
+    private sealed record Activity(string Text, DateTimeOffset UpdatedAt);
+    private Activity activity = new("Starting download", DateTimeOffset.UtcNow);
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public Guid Id { get; } = id;
     public Guid SessionId { get; } = session;
@@ -26,7 +28,11 @@ public sealed class LibraryJob(Guid id, Guid session, string directory)
     // Four-hour recordings can contain hundreds of bounded media parts. Keep
     // per-operation limits while allowing the owner's whole download to finish.
     public CancellationTokenSource Cancel { get; } = new(TimeSpan.FromHours(2));
-    public string Progress { get; set; } = "Starting download";
+    public string Progress {
+        get => Volatile.Read(ref activity).Text;
+        set => Volatile.Write(ref activity, new(value, DateTimeOffset.UtcNow));
+    }
+    public DateTimeOffset ProgressAt => Volatile.Read(ref activity).UpdatedAt;
     public Task? Work { get; set; }
     public PlaytestDownload? Result { get; set; }
 }
@@ -140,7 +146,7 @@ public static class LibraryBrowser
             }, CancellationToken.None);
             return Results.Json(new { jobId = id }, Wire.Json);
         });
-        app.MapGet(token + "/jobs", () => Results.Json(jobs.Values.OrderBy(j => j.CreatedAt).Select(j => new { j.Id, j.SessionId, j.Progress,
+        app.MapGet(token + "/jobs", () => Results.Json(jobs.Values.OrderBy(j => j.CreatedAt).Select(j => new { j.Id, j.SessionId, j.Progress, j.CreatedAt, j.ProgressAt,
             finished = j.Result is not null, result = j.Result, directory = j.Directory }), Wire.Json));
         app.MapPost(token + "/cancel/{id:guid}", (Guid id) => {
             if (!jobs.TryGetValue(id, out var job)) return Results.NotFound(); job.Cancel.Cancel(); return Results.Ok();

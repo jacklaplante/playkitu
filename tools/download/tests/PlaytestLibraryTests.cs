@@ -20,6 +20,33 @@ public sealed class PlaytestLibraryTests
     [SetUp] public void Setup() { root = Path.Combine(Path.GetTempPath(), "playkitu-library-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root); }
     [TearDown] public void Cleanup() { Directory.Delete(root, true); }
 
+    [Test] public async Task MetadataDownloadReportsFileProgressWithinASinglePage()
+    {
+        var store = new FixtureStore();
+        for (int n = 0; n < 8; n++) store.Add("log", n, System.Text.Encoding.UTF8.GetBytes($"Log {n}\n"));
+        var updates = new List<string>();
+        var result = await new PlaytestLibrary(store, new FixtureProbe(), new Converter())
+            .DownloadAsync(FixtureStore.Id, Path.Combine(root, "progress"), updates.Add, default, includeVideo: false);
+        Assert.That(result.Status, Is.EqualTo("logs_downloaded"));
+        Assert.That(updates.Any(s => s.Contains("Checked 1 of 8 files")), Is.True,
+            "A multi-minute metadata page must report completed files before the page finishes.");
+        Assert.That(updates.Any(s => s.Contains("Checked 8 of 8 files")), Is.True);
+    }
+
+    [Test] public async Task MediaTransferReportsActualBytesBeforeCompletion()
+    {
+        var bytes = new byte[65536]; var updates = new List<long>();
+        using var output = new MemoryStream();
+        var budget = new TransferBudget(new RetrievalLimits());
+        await budget.CopyAsync(new MemoryStream(bytes), output, bytes.Length, false, default, copied => {
+            Assert.That(output.Length, Is.EqualTo(copied));
+            updates.Add(copied);
+        });
+        Assert.That(updates, Is.Not.Empty);
+        Assert.That(updates.Any(n => n > 0 && n < bytes.Length), Is.True);
+        Assert.That(updates.Last(), Is.EqualTo(bytes.Length));
+    }
+
     [TestCase(true), TestCase(false)]
     public async Task MissingVideoAndLogsOnlyDownloadsExposeOnlyRecognizedRecorderFailureCodes(bool includeVideo)
     {
@@ -210,6 +237,8 @@ public sealed class PlaytestLibraryTests
             for (var n = 0; n < 100 && !done; n++) { using var state = JsonDocument.Parse(await http.GetStringAsync("jobs")); done = state.RootElement[0].GetProperty("finished").GetBoolean(); if (!done) await Task.Delay(25); }
             Assert.That(done, Is.True);
             using var finishedJobs = JsonDocument.Parse(await http.GetStringAsync("jobs"));
+            var job = finishedJobs.RootElement[0];
+            Assert.That(job.GetProperty("progressAt").GetDateTimeOffset(), Is.GreaterThanOrEqualTo(job.GetProperty("createdAt").GetDateTimeOffset()));
             Assert.That(finishedJobs.RootElement[0].GetProperty("result").GetProperty("failureCode").GetString(), Is.EqualTo("native_startup_timeout"));
             using var media = new HttpRequestMessage(HttpMethod.Get, $"media/{id}/0/preview"); media.Headers.Range = new(1, 2);
             using var response = await http.SendAsync(media);
