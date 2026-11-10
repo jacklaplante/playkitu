@@ -20,6 +20,14 @@ If your game uses assembly definitions, put its adapter in a separate assembly r
 
 Provide a fresh unchecked required checkbox disclosing game-view/game-audio capture and diagnostic uploads. Microphone consent is a separate unchecked choice.
 
+When the host also uses the microphone for live voice chat, set
+`recorder.MicrophoneSourceFactory` to create an `IRecordingMicrophoneSource`
+backed by its shared capture owner. The factory is invoked only after optional
+microphone consent and capture readiness. Each source owns an independent read
+cursor and consumer lifetime: `Close` must release its lease and erase its own
+queued samples without stopping other explicitly enabled consumers. Leaving the
+factory unset retains the package's default Unity microphone device.
+
 This sketch uses host-supplied deployment values, consent choices and an existing ticket owner:
 
 ~~~csharp

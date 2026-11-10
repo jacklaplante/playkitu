@@ -31,6 +31,10 @@ namespace Playkitu.Gameplay
         private RecordingHealthSnapshot lastSnapshot;
         private RecordingMicrophoneFailure microphoneFailure;
         private float gameGain = 1, microphoneGain = 1;
+        // Optional host-owned capture (for example a microphone shared with live voice chat).
+        // Creating a source must not imply consent: it is invoked only inside the existing
+        // consented microphone-start path, and each result is disposed independently on stop.
+        public Func<IRecordingMicrophoneSource> MicrophoneSourceFactory { get; set; }
         private int lastDeliveredObjects;
         public bool CanBegin => !destroyed && isActiveAndEnabled && !quit.Requested && controller == null && (retirement == null || retirement.OwnershipReleased);
         public float GameGain { get => gameGain; set { gameGain = RecordingMicrophone.ClampGain(value); if (capture != null) capture.GameGain = gameGain; } }
@@ -111,7 +115,7 @@ namespace Playkitu.Gameplay
                     capture.GameGain = gameGain; capture.MicrophoneGain = microphoneGain;
                 }
                 if (microphoneConsent && microphone == null && !stopRequested && capture != null && !capture.InputStopped && capture.Error == null && controller.State == RecordingControllerState.Running) {
-                    try { microphone = new RecordingMicrophone(new UnityRecordingMicrophone(new UnityRecordingMicrophoneDevice())); capture.Microphone = microphone; microphone.SetConsent(true, AudioSettings.dspTime); }
+                    try { microphone = new RecordingMicrophone(MicrophoneSourceFactory != null ? MicrophoneSourceFactory() : new UnityRecordingMicrophone(new UnityRecordingMicrophoneDevice())); capture.Microphone = microphone; microphone.SetConsent(true, AudioSettings.dspTime); }
                     catch { microphoneFailure = RecordingMicrophoneFailure.BackendException; StopMicrophone(); } // Optional device failure never changes gameplay/admission.
                 }
                 if (clock.Seconds >= nextHealth || controller.State == RecordingControllerState.Finished) { nextHealth = clock.Seconds + 1; PublishHealth(); }

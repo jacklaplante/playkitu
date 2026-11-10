@@ -54,9 +54,12 @@ namespace Playkitu.Tests
             var go = new GameObject("playkitu inert install");
             try {
                 var host = go.AddComponent<PlaykituRecorder>(); var factory = new OfflineFactory();
+                int microphoneCreates = 0;
+                host.MicrophoneSourceFactory = () => { microphoneCreates++; throw new InvalidOperationException("Device access without consent"); };
                 Assert.That(host.State, Is.EqualTo(RecordingControllerState.Consent));
-                Assert.That(host.Begin(false, false, factory, RecordingProfile.Standard().Freeze(), ".", "sample"), Is.False);
+                Assert.That(host.Begin(false, true, factory, RecordingProfile.Standard().Freeze(), ".", "sample"), Is.False);
                 host.Stop(); Assert.That(factory.Creates, Is.Zero); Assert.That(factory.Requests, Is.Zero);
+                Assert.That(microphoneCreates, Is.Zero);
             } finally { UnityEngine.Object.DestroyImmediate(go); }
         }
 
@@ -66,12 +69,15 @@ namespace Playkitu.Tests
             var factory = new OfflineFactory();
             try {
                 var host = go.AddComponent<PlaykituRecorder>();
+                int microphoneCreates = 0;
+                host.MicrophoneSourceFactory = () => { microphoneCreates++; throw new InvalidOperationException("Optional microphone consent was not granted"); };
                 Assert.That(host.Begin(true, false, factory, RecordingProfile.Standard().Freeze(), ".", "sample"), Is.True);
                 var update = typeof(PlaykituRecorder).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
                 for (int i = 0; i < 10 && host.State != RecordingControllerState.Finished; i++) update.Invoke(host, null);
                 Assert.That(host.State, Is.EqualTo(RecordingControllerState.Finished));
                 Assert.That(factory.Creates, Is.EqualTo(1)); Assert.That(factory.Requests, Is.EqualTo(1));
                 Assert.That(factory.TicketCalls, Is.Zero); Assert.That(host.MicrophoneActive, Is.False);
+                Assert.That(microphoneCreates, Is.Zero);
                 Assert.That(go.GetComponent<RecordingCapture>(), Is.Null);
             } finally { UnityEngine.Object.DestroyImmediate(go); }
             Assert.That(factory.Releases, Is.EqualTo(1));
